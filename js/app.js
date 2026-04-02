@@ -579,6 +579,7 @@ async function bootstrap() {
 
   renderAndBind();
   bindSidebarEvents();
+  bindSidebarToggle();
   bindAuthModalEvents();
 
   startClock(() => {
@@ -587,5 +588,7 @@ async function bootstrap() {
     }
   });
 }
+
+bootstrap();
 
 bootstrap();
