@@ -41,6 +41,8 @@ export function renderApp() {
 
   if (state.currentView === VIEW_TYPES.ADMIN) {
     container.innerHTML = renderAdminView();
+    bindAdminActions();
+
     return;
   }
 
