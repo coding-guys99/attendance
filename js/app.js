@@ -324,13 +324,14 @@ function bindAuthModalEvents() {
 
     const { error } = await signIn(email, password);
 
-    if (error) {
-      showMessage("auth-message", error.message || "登入失敗。", "error");
-      return;
-    }
+if (error) {
+  showMessage("auth-message", error.message || "登入失敗。", "error");
+  return;
+}
 
-    closeAuthModal();
-    renderAndBind();
+await fetchAttendanceRecords();
+closeAuthModal();
+renderAndBind();
   });
 
   authModalBound = true;
@@ -777,7 +778,10 @@ async function bootstrap() {
   await initializeAuth();
   await loadSettings();
   initializeAttendance();
-  await fetchAttendanceRecords();
+
+  if (state.user) {
+    await fetchAttendanceRecords();
+  }
 
   if (!state.filters.month) {
     state.filters.month = getMonthKey(new Date());
