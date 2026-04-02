@@ -72,7 +72,7 @@ export const STORAGE_KEYS = {
 export const DEFAULT_USERS = [
   {
     id: "u001",
-    username: "andy",
+    username: "andy@gmail.com",
     password: "1234",
     name: "Andy",
     role: USER_ROLES.ADMIN,
