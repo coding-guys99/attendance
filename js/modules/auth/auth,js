@@ -1,0 +1,83 @@
+import { USER_ROLES } from "./constants.js";
+import {
+  clearCurrentUser,
+  getCurrentUser,
+  getUsers,
+  saveCurrentUser,
+} from "./storage.js";
+
+export function findUserByCredentials(username, password) {
+  const users = getUsers();
+
+  return users.find(
+    (user) =>
+      user.username.trim().toLowerCase() === username.trim().toLowerCase() &&
+      user.password === password
+  );
+}
+
+export function validateLogin(user) {
+  if (!user) {
+    return {
+      ok: false,
+      message: "帳號或密碼錯誤",
+    };
+  }
+
+  if (!user.isActive) {
+    return {
+      ok: false,
+      message: "此帳號已停用，請聯絡管理員",
+    };
+  }
+
+  return {
+    ok: true,
+    message: "",
+  };
+}
+
+export function login(username, password) {
+  const user = findUserByCredentials(username, password);
+  const result = validateLogin(user);
+
+  if (!result.ok) {
+    return result;
+  }
+
+  saveCurrentUser(user);
+
+  return {
+    ok: true,
+    message: "登入成功",
+    user,
+  };
+}
+
+export function logout() {
+  clearCurrentUser();
+
+  return {
+    ok: true,
+  };
+}
+
+export function isAdmin(user = getCurrentUser()) {
+  return user?.role === USER_ROLES.ADMIN;
+}
+
+export function requireLogin() {
+  const user = getCurrentUser();
+
+  if (!user) {
+    return {
+      ok: false,
+      message: "請先登入",
+    };
+  }
+
+  return {
+    ok: true,
+    user,
+  };
+}
