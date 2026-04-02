@@ -9,6 +9,24 @@ function $(selector) {
   return document.querySelector(selector);
 }
 
+function bindSidebarToggle() {
+  const btn = document.getElementById("menuToggleBtn");
+  const sidebar = document.querySelector(".sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+
+  if (!btn || !sidebar || !overlay) return;
+
+  btn.addEventListener("click", () => {
+    sidebar.classList.add("open");
+    overlay.classList.add("show");
+  });
+
+  overlay.addEventListener("click", () => {
+    sidebar.classList.remove("open");
+    overlay.classList.remove("show");
+  });
+}
+
 function updateClock() {
   const clockEl = document.getElementById("statusClock");
   if (!clockEl) return;
@@ -302,6 +320,8 @@ function init() {
 
   renderAuthUI();
   renderCurrentView();
+  
+  bindSidebarToggle();
 
   if (!getCurrentUser()) {
     openLoginPanel();
