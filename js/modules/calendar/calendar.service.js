@@ -4,12 +4,13 @@ import {
   buildMonthDateKey,
 } from "../../utils/date.js";
 import { getAttendanceAnalysis } from "../../utils/attendance-status.js";
+import { getDayRule } from "./calendar-rules.js";
 
-export function buildCalendarData(records, monthKey) {
+export function buildCalendarData(records = [], monthKey) {
   const daysInMonth = getDaysInMonth(monthKey);
   const firstWeekday = getFirstWeekdayOfMonth(monthKey);
 
-  const map = new Map(records.map((item) => [item.date, item]));
+  const map = new Map((records || []).map((item) => [item.date, item]));
   const cells = [];
 
   for (let i = 0; i < firstWeekday; i += 1) {
@@ -24,6 +25,9 @@ export function buildCalendarData(records, monthKey) {
     const record = map.get(dateKey) || null;
     const analysis = record ? getAttendanceAnalysis(record) : null;
 
+    const currentDate = new Date(`${dateKey}T12:00:00`);
+    const dayRule = getDayRule(currentDate);
+
     cells.push({
       type: "day",
       key: dateKey,
@@ -31,6 +35,7 @@ export function buildCalendarData(records, monthKey) {
       dateKey,
       record,
       analysis,
+      dayRule,
     });
   }
 
