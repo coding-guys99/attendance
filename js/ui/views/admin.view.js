@@ -1,11 +1,9 @@
-import { getUsers, saveUsers } from "./storage.js";
+import { getUsers, saveUsers } from "../../core/storage.js";
 
-function renderAdminView() {
-  const appView = document.getElementById("app-view");
-
+export function renderAdminView() {
   const users = getUsers();
 
-  appView.innerHTML = `
+  return `
     <section class="admin-page">
       <div class="admin-header">
         <h2>白名單管理</h2>
@@ -46,6 +44,4 @@ function renderAdminView() {
       </div>
     </section>
   `;
-
-  bindAdminActions();
 }
