@@ -593,26 +593,26 @@ function bindHistoryEvents() {
   if (editForm && editForm.dataset.bound !== "true") {
     editForm.dataset.bound = "true";
 
-    editForm.addEventListener("submit", (event) => {
-      event.preventDefault();
+    editForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
 
-      const recordId = document.getElementById("edit-record-id")?.value || "";
-      const type = document.getElementById("edit-record-type")?.value || "work";
-      const clockInValue = document.getElementById("edit-clock-in")?.value || "";
-      const clockOutValue = document.getElementById("edit-clock-out")?.value || "";
-      const note = document.getElementById("edit-note")?.value || "";
+  const recordId = document.getElementById("edit-record-id")?.value || "";
+  const type = document.getElementById("edit-record-type")?.value || "work";
+  const clockInValue = document.getElementById("edit-clock-in")?.value || "";
+  const clockOutValue = document.getElementById("edit-clock-out")?.value || "";
+  const note = document.getElementById("edit-note")?.value || "";
 
-      const result = updateFullRecord({
-        recordId,
-        type,
-        clockInValue,
-        clockOutValue,
-        note,
-      });
+  const result = await updateFullRecord({
+    recordId,
+    type,
+    clockInValue,
+    clockOutValue,
+    note,
+  });
 
-      renderAndBind();
-      showMessage("edit-record-message", result.message, result.ok ? "success" : "error");
-    });
+  renderAndBind();
+  showMessage("edit-record-message", result.message, result.ok ? "success" : "error");
+});
   }
 
   if (clearAllBtn && clearAllBtn.dataset.bound !== "true") {
