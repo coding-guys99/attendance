@@ -1,5 +1,6 @@
 import { state } from "../../core/state.js";
 import { ATTENDANCE_STATUS, RECORD_TYPES } from "../../core/constants.js";
+
 import { createClockInRecord } from "./attendance.model.js";
 import { loadRecords, saveRecords, replaceAllRecords } from "./attendance.store.js";
 import {
@@ -8,10 +9,15 @@ import {
   findRecordByDate,
   buildManualCompletedRecord,
 } from "./attendance.utils.js";
+
+import { mapRecordFromDb, mapRecordToDb } from "./attendance.mapper.js";
+
 import { generateId } from "../../utils/id.js";
 import { getDateKey } from "../../utils/date.js";
 import { getSecondsBetween } from "../../utils/time.js";
 import { evaluateGeofence } from "../../utils/geofence.js";
+
+import { supabase } from "../../lib/supabase.js";
 
 function sortRecords(records) {
   return [...records].sort((a, b) => {
@@ -19,24 +25,147 @@ function sortRecords(records) {
   });
 }
 
+function commitRecords(records) {
+  state.records = sortRecords(records);
+  saveRecords(state.records);
+}
+
+function upsertLocalRecord(record) {
+  const exists = state.records.some((item) => item.id === record.id);
+
+  if (exists) {
+    commitRecords(state.records.map((item) => (item.id === record.id ? record : item)));
+    return;
+  }
+
+  commitRecords([record, ...state.records]);
+}
+
+function removeLocalRecord(recordId) {
+  commitRecords(state.records.filter((item) => item.id !== recordId));
+}
+
+function isLoggedIn() {
+  return !!state.user?.id;
+}
+
 export function initializeAttendance() {
   state.records = sortRecords(loadRecords()).map((item) => ({
     type: RECORD_TYPES.WORK,
     ...item,
   }));
+
+  // 若已登入，背景同步 Supabase 資料
+  if (isLoggedIn()) {
+    fetchAttendanceRecords().catch((error) => {
+      console.error("fetchAttendanceRecords failed:", error);
+    });
+  }
 }
 
 export function getTodayRecord(now = new Date()) {
   return findTodayRecord(state.records, now);
 }
 
-export function clockIn(now = new Date()) {
+export async function fetchAttendanceRecords() {
+  if (!isLoggedIn()) return state.records;
+
+  const { data, error } = await supabase
+    .from("attendance_records")
+    .select("*")
+    .eq("user_id", state.user.id)
+    .order("date", { ascending: false });
+
+  if (error) throw error;
+
+  const records = (data || []).map(mapRecordFromDb);
+  state.records = sortRecords(records);
+  replaceAllRecords(state.records);
+
+  return state.records;
+}
+
+export async function createAttendanceRecord(record) {
+  if (!isLoggedIn()) {
+    upsertLocalRecord(record);
+    return record;
+  }
+
+  const payload = mapRecordToDb(record, state.user.id);
+
+  const { data, error } = await supabase
+    .from("attendance_records")
+    .insert(payload)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+
+  const mapped = mapRecordFromDb(data);
+  upsertLocalRecord(mapped);
+  replaceAllRecords(state.records);
+
+  return mapped;
+}
+
+export async function updateAttendanceRecord(recordId, updates) {
+  if (!isLoggedIn()) {
+    const target = state.records.find((item) => item.id === recordId);
+    if (!target) throw new Error("找不到要更新的紀錄。");
+
+    const updated = {
+      ...target,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+
+    upsertLocalRecord(updated);
+    return updated;
+  }
+
+  const { data, error } = await supabase
+    .from("attendance_records")
+    .update(updates)
+    .eq("id", recordId)
+    .eq("user_id", state.user.id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+
+  const mapped = mapRecordFromDb(data);
+  upsertLocalRecord(mapped);
+  replaceAllRecords(state.records);
+
+  return mapped;
+}
+
+export async function deleteAttendanceRecord(recordId) {
+  if (!isLoggedIn()) {
+    removeLocalRecord(recordId);
+    return;
+  }
+
+  const { error } = await supabase
+    .from("attendance_records")
+    .delete()
+    .eq("id", recordId)
+    .eq("user_id", state.user.id);
+
+  if (error) throw error;
+
+  removeLocalRecord(recordId);
+  replaceAllRecords(state.records);
+}
+
+export async function clockIn(now = new Date()) {
   const existing = getTodayRecord(now);
 
   if (existing) {
     if (existing.status === ATTENDANCE_STATUS.WORKING) {
       return { ok: false, message: "今天已經上班打卡了。" };
     }
+
     if (existing.status === ATTENDANCE_STATUS.COMPLETED) {
       return { ok: false, message: "今天的上下班紀錄已完成。" };
     }
@@ -44,13 +173,16 @@ export function clockIn(now = new Date()) {
 
   const record = createClockInRecord(now);
 
-  state.records = sortRecords([record, ...state.records]);
-  saveRecords(state.records);
-
-  return { ok: true, message: "上班打卡成功。", record };
+  try {
+    const savedRecord = await createAttendanceRecord(record);
+    return { ok: true, message: "上班打卡成功。", record: savedRecord };
+  } catch (error) {
+    console.error("clockIn error:", error);
+    return { ok: false, message: error.message || "上班打卡失敗。" };
+  }
 }
 
-export function clockOut(now = new Date()) {
+export async function clockOut(now = new Date()) {
   const existing = getTodayRecord(now);
 
   if (!existing) {
@@ -67,16 +199,31 @@ export function clockOut(now = new Date()) {
 
   const updated = completeRecord(existing, now);
 
-  state.records = sortRecords(
-    state.records.map((item) => (item.id === updated.id ? updated : item))
-  );
+  try {
+    const savedRecord = await updateAttendanceRecord(existing.id, {
+      date: updated.date,
+      type: updated.type,
+      clock_in: updated.clockIn,
+      clock_out: updated.clockOut,
+      work_seconds: updated.workSeconds,
+      status: updated.status,
+      note: updated.note || "",
+      updated_at: new Date().toISOString(),
+    });
 
-  saveRecords(state.records);
-
-  return { ok: true, message: "下班打卡成功。", record: updated };
+    return { ok: true, message: "下班打卡成功。", record: savedRecord };
+  } catch (error) {
+    console.error("clockOut error:", error);
+    return { ok: false, message: error.message || "下班打卡失敗。" };
+  }
 }
 
-export function createManualRecord({ clockInValue, clockOutValue, note = "", type = RECORD_TYPES.WORK }) {
+export function createManualRecord({
+  clockInValue,
+  clockOutValue,
+  note = "",
+  type = RECORD_TYPES.WORK,
+}) {
   if (!clockInValue || !clockOutValue) {
     return { ok: false, message: "請先填寫上班與下班時間。" };
   }
@@ -112,8 +259,7 @@ export function createManualRecord({ clockInValue, clockOutValue, note = "", typ
     type,
   });
 
-  state.records = sortRecords([record, ...state.records]);
-  saveRecords(state.records);
+  upsertLocalRecord(record);
 
   return { ok: true, message: "補卡成功。", record };
 }
@@ -146,13 +292,18 @@ export function createStatusRecord({ dateValue, type, note = "" }) {
     type,
   });
 
-  state.records = sortRecords([record, ...state.records]);
-  saveRecords(state.records);
+  upsertLocalRecord(record);
 
   return { ok: true, message: "狀態紀錄已新增。", record };
 }
 
-export function updateFullRecord({ recordId, clockInValue, clockOutValue, note = "", type = RECORD_TYPES.WORK }) {
+export function updateFullRecord({
+  recordId,
+  clockInValue,
+  clockOutValue,
+  note = "",
+  type = RECORD_TYPES.WORK,
+}) {
   const target = state.records.find((item) => item.id === recordId);
   if (!target) {
     return { ok: false, message: "找不到要編輯的紀錄。" };
@@ -191,20 +342,17 @@ export function updateFullRecord({ recordId, clockInValue, clockOutValue, note =
     type,
     clockIn: clockInDate.toISOString(),
     clockOut: clockOutDate.toISOString(),
-    workSeconds: type === RECORD_TYPES.WORK
-      ? getSecondsBetween(clockInDate.toISOString(), clockOutDate.toISOString())
-      : 0,
+    workSeconds:
+      type === RECORD_TYPES.WORK
+        ? getSecondsBetween(clockInDate.toISOString(), clockOutDate.toISOString())
+        : 0,
     status: ATTENDANCE_STATUS.COMPLETED,
     note: note.trim(),
     createdAt: clockInDate.toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  state.records = sortRecords(
-    state.records.map((item) => (item.id === recordId ? updated : item))
-  );
-
-  saveRecords(state.records);
+  upsertLocalRecord(updated);
 
   return { ok: true, message: "紀錄已更新。", record: updated };
 }
@@ -240,8 +388,7 @@ export function importRecordsFromJSON(records) {
 }
 
 export function deleteRecord(recordId) {
-  state.records = sortRecords(state.records.filter((item) => item.id !== recordId));
-  saveRecords(state.records);
+  removeLocalRecord(recordId);
 }
 
 export function clearAllRecords() {
@@ -249,73 +396,13 @@ export function clearAllRecords() {
   saveRecords(state.records);
 }
 
-import { supabase } from "../../lib/supabase.js";
-import { mapRecordFromDb, mapRecordToDb } from "./attendance.mapper.js";
-
-export async function fetchAttendanceRecords() {
-  if (!state.user) return [];
-
-  const { data, error } = await supabase
-    .from("attendance_records")
-    .select("*")
-    .order("date", { ascending: false });
-
-  if (error) throw error;
-
-  state.records = (data || []).map(mapRecordFromDb);
-  return state.records;
-}
-
-export async function createAttendanceRecord(record) {
-  if (!state.user) throw new Error("User not logged in");
-
-  const payload = mapRecordToDb(record, state.user.id);
-
-  const { data, error } = await supabase
-    .from("attendance_records")
-    .insert(payload)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  const mapped = mapRecordFromDb(data);
-  state.records = [mapped, ...state.records];
-  return mapped;
-}
-
-export async function updateAttendanceRecord(recordId, updates) {
-  const { data, error } = await supabase
-    .from("attendance_records")
-    .update(updates)
-    .eq("id", recordId)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  const mapped = mapRecordFromDb(data);
-  state.records = state.records.map((item) =>
-    item.id === recordId ? mapped : item
-  );
-
-  return mapped;
-}
-
-export async function deleteAttendanceRecord(recordId) {
-  const { error } = await supabase
-    .from("attendance_records")
-    .delete()
-    .eq("id", recordId);
-
-  if (error) throw error;
-
-  state.records = state.records.filter((item) => item.id !== recordId);
-}
-
-
 export async function createClockInRecordWithLocation(record, userPosition) {
-  if (!state.user) throw new Error("User not logged in");
+  if (!isLoggedIn()) {
+    return {
+      ok: false,
+      message: "User not logged in",
+    };
+  }
 
   const fence = evaluateGeofence(userPosition, state.settings);
 
@@ -350,15 +437,24 @@ export async function createClockInRecordWithLocation(record, userPosition) {
 
   if (error) throw error;
 
+  const mapped = mapRecordFromDb(data);
+  upsertLocalRecord(mapped);
+  replaceAllRecords(state.records);
+
   return {
     ok: true,
     message: "上班打卡成功。",
-    record: data,
+    record: mapped,
   };
 }
 
 export async function clockOutWithLocation(recordId, userPosition) {
-  if (!state.user) throw new Error("User not logged in");
+  if (!isLoggedIn()) {
+    return {
+      ok: false,
+      message: "User not logged in",
+    };
+  }
 
   const fence = evaluateGeofence(userPosition, state.settings);
 
@@ -377,16 +473,22 @@ export async function clockOutWithLocation(recordId, userPosition) {
       clock_out_accuracy: userPosition.accuracy,
       clock_out_distance_meters: fence.distanceMeters,
       clock_out_inside_fence: fence.insideFence,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", recordId)
+    .eq("user_id", state.user.id)
     .select("*")
     .single();
 
   if (error) throw error;
 
+  const mapped = mapRecordFromDb(data);
+  upsertLocalRecord(mapped);
+  replaceAllRecords(state.records);
+
   return {
     ok: true,
     message: "下班打卡成功。",
-    record: data,
+    record: mapped,
   };
 }
