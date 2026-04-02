@@ -21,28 +21,57 @@ function renderCalendar(cells) {
         return `<div class="calendar__cell calendar__cell--empty"></div>`;
       }
 
-      const { record, dayNumber, analysis } = cell;
+      const { record, dayNumber, analysis, dayRule } = cell;
 
       let statusClass = "";
       let statusText = "無紀錄";
+      let metaText = "-";
+      let infoText = "";
+      const dayLabel = record?.dayLabel || dayRule?.label || "";
 
       if (record) {
         if (record.type && record.type !== RECORD_TYPES.WORK) {
           statusClass = "calendar__cell--status";
           statusText = RECORD_TYPE_LABELS[record.type] || "狀態";
+          infoText = RECORD_TYPE_LABELS[record.type] || "狀態紀錄";
+          metaText = record.note || dayLabel || "-";
         } else if (analysis?.isLate && analysis?.isEarlyLeave) {
           statusClass = "calendar__cell--warn";
           statusText = "遲到 / 早退";
+          infoText = `${record.clockIn ? formatTime(record.clockIn) : "-"} / ${
+            record.clockOut ? formatTime(record.clockOut) : "-"
+          }`;
+          metaText = `${formatDuration(record.workSeconds || 0)}${dayLabel ? `・${dayLabel}` : ""}`;
         } else if (analysis?.isLate || analysis?.isEarlyLeave) {
           statusClass = "calendar__cell--late";
           statusText = analysis.label;
+          infoText = `${record.clockIn ? formatTime(record.clockIn) : "-"} / ${
+            record.clockOut ? formatTime(record.clockOut) : "-"
+          }`;
+          metaText = `${formatDuration(record.workSeconds || 0)}${dayLabel ? `・${dayLabel}` : ""}`;
         } else if (analysis?.isOvertime) {
           statusClass = "calendar__cell--overtime";
           statusText = "加班";
+          infoText = `${record.clockIn ? formatTime(record.clockIn) : "-"} / ${
+            record.clockOut ? formatTime(record.clockOut) : "-"
+          }`;
+          metaText = `${formatDuration(record.workSeconds || 0)}${dayLabel ? `・${dayLabel}` : ""}`;
         } else {
           statusClass = "calendar__cell--done";
           statusText = "正常";
+          infoText =
+            record.type === RECORD_TYPES.WORK
+              ? `${record.clockIn ? formatTime(record.clockIn) : "-"} / ${
+                  record.clockOut ? formatTime(record.clockOut) : "-"
+                }`
+              : RECORD_TYPE_LABELS[record.type] || "狀態紀錄";
+          metaText =
+            record.type === RECORD_TYPES.WORK
+              ? `${formatDuration(record.workSeconds || 0)}${dayLabel ? `・${dayLabel}` : ""}`
+              : record.note || dayLabel || "-";
         }
+      } else if (dayLabel) {
+        metaText = dayLabel;
       }
 
       return `
@@ -51,11 +80,11 @@ function renderCalendar(cells) {
           ${
             record
               ? `
-                <div class="calendar__info">${record.type === RECORD_TYPES.WORK ? `${formatTime(record.clockIn)} / ${formatTime(record.clockOut)}` : (RECORD_TYPE_LABELS[record.type] || "狀態紀錄")}</div>
-                <div class="calendar__meta">${record.type === RECORD_TYPES.WORK ? formatDuration(record.workSeconds || 0) : (record.note || "-")}</div>
+                <div class="calendar__info">${infoText}</div>
+                <div class="calendar__meta">${metaText}</div>
                 <div class="calendar__status">${statusText}</div>
               `
-              : `<div class="calendar__meta">-</div>`
+              : `<div class="calendar__meta">${metaText}</div>`
           }
         </div>
       `;
@@ -74,10 +103,12 @@ function renderEditRows(filteredRecords) {
   return filteredRecords
     .map((record) => {
       const analysis = getAttendanceAnalysis(record);
+      const dayLabel = record.dayLabel || "-";
 
       return `
         <tr>
           <td>${formatDate(record.date)}</td>
+          <td>${dayLabel}</td>
           <td>${RECORD_TYPE_LABELS[record.type] || "上班"}</td>
           <td>${record.type === RECORD_TYPES.WORK ? (record.clockIn ? formatTime(record.clockIn) : "-") : "-"}</td>
           <td>${record.type === RECORD_TYPES.WORK ? (record.clockOut ? formatTime(record.clockOut) : "-") : "-"}</td>
@@ -86,12 +117,14 @@ function renderEditRows(filteredRecords) {
           <td class="table-note">${record.note || "-"}</td>
           <td>
             <div class="action-row">
-              <button class="btn btn--ghost btn-open-edit-record"
+              <button
+                class="btn btn--ghost btn-open-edit-record"
                 data-id="${record.id}"
                 data-type="${record.type || RECORD_TYPES.WORK}"
                 data-clock-in="${record.clockIn || ""}"
                 data-clock-out="${record.clockOut || ""}"
-                data-note="${encodeURIComponent(record.note || "")}">
+                data-note="${encodeURIComponent(record.note || "")}"
+              >
                 編輯整筆
               </button>
               <button class="btn btn--danger btn-delete-record" data-id="${record.id}">
@@ -109,6 +142,7 @@ export function renderHistoryView() {
   const summary = getHistorySummary();
   const months = getMonthOptions();
   const { month, keyword } = state.filters;
+
   const filteredRecords = filterRecords({ month, keyword });
   const calendarCells = buildCalendarData(
     filterRecords({ month, keyword: "" }),
@@ -116,24 +150,28 @@ export function renderHistoryView() {
   );
 
   const monthOptionsHtml = months
-    .map((item) => `<option value="${item}" ${item === month ? "selected" : ""}>${item}</option>`)
+    .map(
+      (item) =>
+        `<option value="${item}" ${item === month ? "selected" : ""}>${item}</option>`
+    )
     .join("");
 
   const firstEditable = filteredRecords[0] || null;
+  const isWorkRecord = firstEditable?.type === RECORD_TYPES.WORK;
 
-  const defaultEditClockIn = firstEditable?.clockIn
-    ? toLocalDatetimeValue(firstEditable.clockIn)
-    : "";
-  const defaultEditClockOut = firstEditable?.clockOut
-    ? toLocalDatetimeValue(firstEditable.clockOut)
-    : "";
+  const defaultEditClockIn =
+    firstEditable?.clockIn && isWorkRecord ? toLocalDatetimeValue(firstEditable.clockIn) : "";
+
+  const defaultEditClockOut =
+    firstEditable?.clockOut && isWorkRecord ? toLocalDatetimeValue(firstEditable.clockOut) : "";
+
   const defaultNote = firstEditable?.note || "";
 
   return `
     <div class="section-block">
       <div class="history-summary">
         <div class="kpi">
-        <p class="kpi__label">總紀錄天數</p>
+          <p class="kpi__label">總紀錄天數</p>
           <h4 class="kpi__value">${summary.totalDays}</h4>
         </div>
         <div class="kpi">
@@ -160,7 +198,7 @@ export function renderHistoryView() {
             <div class="inline-badge">${month || summary.currentMonthKey}</div>
           </div>
           ${renderCalendar(calendarCells)}
-          </div>
+        </div>
       </div>
 
       <div class="section__header">
@@ -194,7 +232,8 @@ export function renderHistoryView() {
               <input
                 id="filter-keyword"
                 class="input"
-                type="text"placeholder="搜尋備註、狀態或類型"
+                type="text"
+                placeholder="搜尋備註、狀態或類型"
                 value="${keyword || ""}"
               />
             </div>
@@ -219,16 +258,24 @@ export function renderHistoryView() {
               <div class="field">
                 <label for="edit-record-type">紀錄類型</label>
                 <select id="edit-record-type" name="editRecordType" class="input">
-                  <option value="work" ${firstEditable?.type === 'work' ? 'selected' : ''}>上班</option>
-                  <option value="leave" ${firstEditable?.type === 'leave' ? 'selected' : ''}>休假</option>
-                  <option value="sick" ${firstEditable?.type === 'sick' ? 'selected' : ''}>病假</option>
-                  <option value="business_trip" ${firstEditable?.type === 'business_trip' ? 'selected' : ''}>出差</option>
-                  <option value="out_of_office" ${firstEditable?.type === 'out_of_office' ? 'selected' : ''}>外出</option>
+                  <option value="work" ${firstEditable?.type === "work" ? "selected" : ""}>上班</option>
+                  <option value="leave" ${firstEditable?.type === "leave" ? "selected" : ""}>休假</option>
+                  <option value="sick" ${firstEditable?.type === "sick" ? "selected" : ""}>病假</option>
+                  <option value="business_trip" ${firstEditable?.type === "business_trip" ? "selected" : ""}>出差</option>
+                  <option value="out_of_office" ${firstEditable?.type === "out_of_office" ? "selected" : ""}>外出</option>
                 </select>
               </div>
+
               <div class="field">
                 <label for="edit-note">備註</label>
-                <input id="edit-note" name="editNote" class="input" type="text" value="${defaultNote}" placeholder="編輯這筆紀錄的備註" />
+                <input
+                  id="edit-note"
+                  name="editNote"
+                  class="input"
+                  type="text"
+                  value="${defaultNote}"
+                  placeholder="編輯這筆紀錄的備註"
+                />
               </div>
             </div>
 
@@ -242,7 +289,7 @@ export function renderHistoryView() {
                   type="datetime-local"
                   step="1"
                   value="${defaultEditClockIn}"
-                  required
+                  ${isWorkRecord || !firstEditable ? "required" : ""}
                 />
               </div>
 
@@ -255,7 +302,7 @@ export function renderHistoryView() {
                   type="datetime-local"
                   step="1"
                   value="${defaultEditClockOut}"
-                  required
+                  ${isWorkRecord || !firstEditable ? "required" : ""}
                 />
               </div>
             </div>
@@ -277,6 +324,7 @@ export function renderHistoryView() {
                 <thead>
                   <tr>
                     <th>日期</th>
+                    <th>日別</th>
                     <th>類型</th>
                     <th>上班</th>
                     <th>下班</th>
