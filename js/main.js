@@ -233,23 +233,36 @@ function bindAttendanceActions() {
 
 function bindSidebarToggle() {
   const btn = document.getElementById("menuToggleBtn");
-  const sidebar = document.querySelector(".sidebar");
+  const sidebar = document.getElementById("sidebar");
   const overlay = document.getElementById("sidebarOverlay");
+
+  console.log("bindSidebarToggle init", { btn, sidebar, overlay });
 
   if (!btn || !sidebar || !overlay) return;
 
-  btn.addEventListener("click", () => {
+  btn.onclick = null;
+
+  btn.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    console.log("menu button clicked before:", sidebar.className, overlay.className);
+
     sidebar.classList.toggle("open");
     overlay.classList.toggle("show");
+
+    console.log("menu button clicked after:", sidebar.className, overlay.className);
   });
 
   overlay.addEventListener("click", () => {
+    console.log("overlay clicked");
     sidebar.classList.remove("open");
     overlay.classList.remove("show");
   });
 
   document.querySelectorAll(".sidebar .nav-btn").forEach((button) => {
     button.addEventListener("click", () => {
+      console.log("nav clicked");
       sidebar.classList.remove("open");
       overlay.classList.remove("show");
     });
