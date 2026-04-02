@@ -281,6 +281,64 @@ function renderAdminView() {
   `;
 }
 
+function bindAdminActions() {
+  const users = getUsers();
+
+  // 啟用/停用
+  document.querySelectorAll(".toggle-active").forEach(input => {
+    input.addEventListener("change", () => {
+      const id = input.dataset.id;
+      const user = users.find(u => u.id === id);
+      user.isActive = input.checked;
+      saveUsers(users);
+    });
+  });
+
+  // 打卡權限
+  document.querySelectorAll(".toggle-checkin").forEach(input => {
+    input.addEventListener("change", () => {
+      const id = input.dataset.id;
+      const user = users.find(u => u.id === id);
+      user.canCheckIn = input.checked;
+      saveUsers(users);
+    });
+  });
+
+  // 刪除
+  document.querySelectorAll(".btn-delete").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+
+      const updated = users.filter(u => u.id !== id);
+      saveUsers(updated);
+
+      renderAdminView();
+    });
+  });
+
+  // 新增
+  document.getElementById("addUserBtn")?.addEventListener("click", () => {
+    const name = prompt("姓名");
+    const username = prompt("帳號");
+    const password = prompt("密碼");
+
+    if (!name || !username || !password) return;
+
+    users.push({
+      id: "u_" + Date.now(),
+      name,
+      username,
+      password,
+      role: "employee",
+      isActive: true,
+      canCheckIn: true
+    });
+
+    saveUsers(users);
+    renderAdminView();
+  });
+}
+
 function renderCurrentView() {
   switch (currentView) {
     case VIEW_TYPES.ADMIN:
