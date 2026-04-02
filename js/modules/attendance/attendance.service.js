@@ -18,6 +18,7 @@ import { getSecondsBetween } from "../../utils/time.js";
 import { evaluateGeofence } from "../../utils/geofence.js";
 
 import { supabase } from "../../lib/supabase.js";
+import { getDayRule } from "../calendar/calendar-rules.js";
 
 function sortRecords(records) {
   return [...records].sort((a, b) => {
@@ -171,7 +172,13 @@ export async function clockIn(now = new Date()) {
     }
   }
 
-  const record = createClockInRecord(now);
+  const dayRule = getDayRule(now);
+
+const record = {
+  ...createClockInRecord(now),
+  dayType: dayRule.type,
+  dayLabel: dayRule.label,
+};
 
   try {
     const savedRecord = await createAttendanceRecord(record);
@@ -219,6 +226,19 @@ export async function clockOut(now = new Date()) {
 }
 
 export function createManualRecord({
+const dayRule = getDayRule(clockInDate);
+
+const record = buildManualCompletedRecord({
+  id: generateId(),
+  date: dateKey,
+  clockInISO: clockInDate.toISOString(),
+  clockOutISO: clockOutDate.toISOString(),
+  note: note.trim(),
+  type,
+});
+
+record.dayType = dayRule.type;
+record.dayLabel = dayRule.label;
   clockInValue,
   clockOutValue,
   note = "",
@@ -265,6 +285,19 @@ export function createManualRecord({
 }
 
 export function createStatusRecord({ dateValue, type, note = "" }) {
+  const dayRule = getDayRule(targetDate);
+
+const record = buildManualCompletedRecord({
+  id: generateId(),
+  date: dateKey,
+  clockInISO: start.toISOString(),
+  clockOutISO: end.toISOString(),
+  note: note.trim(),
+  type,
+});
+
+record.dayType = dayRule.type;
+record.dayLabel = dayRule.label;
   if (!dateValue) {
     return { ok: false, message: "請先選擇日期。" };
   }
@@ -337,6 +370,8 @@ export async function updateFullRecord({
   if (duplicate) {
     return { ok: false, message: "該日期已有其他紀錄，不能重複。" };
   }
+  
+  const dayRule = getDayRule(clockInDate);
 
   const updated = {
     ...target,
@@ -349,6 +384,8 @@ export async function updateFullRecord({
         ? getSecondsBetween(clockInDate.toISOString(), clockOutDate.toISOString())
         : 0,
     status: ATTENDANCE_STATUS.COMPLETED,
+    dayType: dayRule.type,
+dayLabel: dayRule.label,
     note: note.trim(),
     createdAt: clockInDate.toISOString(),
     updatedAt: new Date().toISOString(),
