@@ -1,6 +1,7 @@
 import { state } from "./core/state.js";
 import { VIEW_TYPES } from "./core/constants.js";
 import { renderApp } from "./ui/renderer.js";
+
 import {
   initializeAttendance,
   clockIn,
@@ -12,92 +13,35 @@ import {
   deleteRecord,
   clearAllRecords,
 } from "./modules/attendance/attendance.service.js";
+
 import { startClock } from "./modules/clock/clock.js";
+
 import {
   exportAttendanceCSV,
   exportAttendanceJSON,
 } from "./modules/export/export.service.js";
+
 import { getMonthKey, toLocalDatetimeValue } from "./utils/date.js";
+
 import {
   loadSettings,
   saveSettings,
   resetSettings,
 } from "./modules/settings/settings.service.js";
+
 import { getCurrentPositionAsync, evaluateGeofence } from "./utils/geofence.js";
+
 import {
   initializeAuth,
   signIn,
 } from "./modules/auth/auth.service.js";
 
-function bindSidebarToggle() {
-  const btn = document.getElementById("menuToggleBtn");
-  const sidebar = document.querySelector(".sidebar");
-  const overlay = document.getElementById("sidebarOverlay");
-
-  if (!btn || !sidebar || !overlay) return;
-
-  btn.addEventListener("click", () => {
-    sidebar.classList.add("open");
-    overlay.classList.add("show");
-  });
-
-  overlay.addEventListener("click", () => {
-    sidebar.classList.remove("open");
-    overlay.classList.remove("show");
-  });
-}
-
-function openAuthModal() {
-  const modal = document.getElementById("auth-modal");
-  if (!modal) return;
-  modal.classList.remove("is-hidden");
-}
-
-function closeAuthModal() {
-  const modal = document.getElementById("auth-modal");
-  if (!modal) return;
-  modal.classList.add("is-hidden");
-}
-
-function bindAuthModalEvents() {
-  const loginForm = document.getElementById("auth-login-form");
-  const closeBtn = document.getElementById("auth-modal-close-btn");
-
-  if (closeBtn) {
-    closeBtn.addEventListener("click", () => {
-      closeAuthModal();
-      clearMessage("auth-message");
-    });
-  }
-
-  if (loginForm) {
-    loginForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      const formData = new FormData(loginForm);
-      const email = formData.get("email");
-      const password = formData.get("password");
-
-      const { error } = await signIn(email, password);
-
-      if (error) {
-        showMessage("auth-message", error.message || "登入失敗。", "error");
-        return;
-      }
-
-      closeAuthModal();
-      clearMessage("auth-message");
-      renderAndBind();
-    });
-  }
-}
-
-function requireLogin(message = "請先登入。") {
-  if (state.user) return true;
-  openAuthModal();
-  showMessage("auth-message", message, "error");
-  return false;
-}
+let sidebarToggleBound = false;
+let sidebarNavBound = false;
+let authModalBound = false;
+let userMenuBound = false;
+let topbarActionsBound = false;
+let clockInitialized = false;
 
 const ATTENDANCE_STATUS = {
   NOT_STARTED: "not_started",
@@ -117,56 +61,9 @@ const statusClassMap = {
   [ATTENDANCE_STATUS.COMPLETED]: "status-badge--completed",
 };
 
-const todayAttendance = {
-  status: ATTENDANCE_STATUS.WORKING,
-  notifications: 2,
-};
-
-function updateClock() {
-  const clockEl = document.getElementById("statusClock");
-  if (!clockEl) return;
-
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const date = String(now.getDate()).padStart(2, "0");
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const seconds = String(now.getSeconds()).padStart(2, "0");
-
-  clockEl.textContent = `${year}/${month}/${date} ${hours}:${minutes}:${seconds}`;
+function $(selector) {
+  return document.querySelector(selector);
 }
-
-function renderAttendanceStatus() {
-  const statusEl = document.getElementById("attendanceStatus");
-  if (!statusEl) return;
-
-  const status = todayAttendance.status;
-  statusEl.textContent = statusTextMap[status];
-  statusEl.className = `status-badge ${statusClassMap[status]}`;
-}
-
-function bindUserMenu() {
-  const menu = document.querySelector(".user-menu");
-  const trigger = document.querySelector(".user-menu__trigger");
-
-  if (!menu || !trigger) return;
-
-  trigger.addEventListener("click", () => {
-    menu.classList.toggle("open");
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!menu.contains(e.target)) {
-      menu.classList.remove("open");
-    }
-  });
-}
-
-updateClock();
-setInterval(updateClock, 1000);
-renderAttendanceStatus();
-bindUserMenu();
 
 function showMessage(targetId, message, type = "success") {
   const el = document.getElementById(targetId);
@@ -184,13 +81,254 @@ function clearMessage(targetId) {
   el.className = "message-box";
 }
 
+function openAuthModal() {
+  const modal = document.getElementById("auth-modal");
+  if (!modal) return;
+  modal.classList.remove("is-hidden");
+}
+
+function closeAuthModal() {
+  const modal = document.getElementById("auth-modal");
+  if (!modal) return;
+  modal.classList.add("is-hidden");
+  clearMessage("auth-message");
+}
+
+function requireLogin(message = "請先登入。") {
+  if (state.user) return true;
+  openAuthModal();
+  showMessage("auth-message", message, "error");
+  return false;
+}
+
+function closeSidebar() {
+  document.getElementById("sidebar")?.classList.remove("open");
+  document.getElementById("sidebarOverlay")?.classList.remove("show");
+}
+
+function bindSidebarToggle() {
+  const btn = document.getElementById("menuToggleBtn");
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+
+  if (!btn || !sidebar || !overlay) return;
+
+  if (!sidebarToggleBound) {
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      sidebar.classList.toggle("open");
+      overlay.classList.toggle("show");
+    });
+
+    overlay.addEventListener("click", () => {
+      closeSidebar();
+    });
+
+    sidebarToggleBound = true;
+  }
+
+  document.querySelectorAll(".sidebar .nav-btn").forEach((button) => {
+    if (button.dataset.sidebarBound === "true") return;
+
+    button.dataset.sidebarBound = "true";
+    button.addEventListener("click", () => {
+      closeSidebar();
+    });
+  });
+}
+
+function bindUserMenu() {
+  const menu = document.querySelector(".user-menu");
+  const trigger = document.querySelector(".user-menu__trigger");
+
+  if (!menu || !trigger || userMenuBound) return;
+
+  trigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    menu.classList.toggle("open");
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!menu.contains(event.target)) {
+      menu.classList.remove("open");
+    }
+  });
+
+  userMenuBound = true;
+}
+
+function bindTopbarActions() {
+  if (topbarActionsBound) return;
+
+  document.getElementById("loginEntryBtn")?.addEventListener("click", () => {
+    openAuthModal();
+  });
+
+  document.getElementById("logoutBtn")?.addEventListener("click", () => {
+    showMessage("auth-message", "目前尚未接上登出功能。", "error");
+    openAuthModal();
+  });
+
+  document.getElementById("logoutBtnDropdown")?.addEventListener("click", () => {
+    showMessage("auth-message", "目前尚未接上登出功能。", "error");
+    openAuthModal();
+  });
+
+  topbarActionsBound = true;
+}
+
+function updateClock() {
+  const clockEl = document.getElementById("statusClock");
+  if (!clockEl) return;
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const date = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const seconds = String(now.getSeconds()).padStart(2, "0");
+
+  clockEl.textContent = `${year}/${month}/${date} ${hours}:${minutes}:${seconds}`;
+}
+
+function getTopbarAttendanceStatus() {
+  if (!state.user) return ATTENDANCE_STATUS.NOT_STARTED;
+
+  const guessedStatus =
+    state.attendanceStatus ||
+    state.todayAttendance?.status ||
+    state.dashboard?.attendanceStatus ||
+    ATTENDANCE_STATUS.WORKING;
+
+  if (
+    guessedStatus === ATTENDANCE_STATUS.NOT_STARTED ||
+    guessedStatus === ATTENDANCE_STATUS.WORKING ||
+    guessedStatus === ATTENDANCE_STATUS.COMPLETED
+  ) {
+    return guessedStatus;
+  }
+
+  return ATTENDANCE_STATUS.WORKING;
+}
+
+function renderAttendanceStatus() {
+  const statusEl = document.getElementById("attendanceStatus");
+  if (!statusEl) return;
+
+  if (!state.user) {
+    statusEl.textContent = "未登入";
+    statusEl.className = "status-badge status-badge--not-started";
+    return;
+  }
+
+  const status = getTopbarAttendanceStatus();
+  statusEl.textContent = statusTextMap[status] || "上班中";
+  statusEl.className = `status-badge ${statusClassMap[status] || "status-badge--working"}`;
+}
+
+function renderTopbarUser() {
+  const userNameEl = document.getElementById("topbarUserName");
+  const userAvatarEl = document.getElementById("topbarUserAvatar");
+  const loginEntryBtn = document.getElementById("loginEntryBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  if (!userNameEl || !userAvatarEl) return;
+
+  if (!state.user) {
+    userNameEl.textContent = "未登入";
+    userAvatarEl.textContent = "?";
+
+    if (loginEntryBtn) loginEntryBtn.style.display = "inline-flex";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    return;
+  }
+
+  const displayName =
+    state.user.name ||
+    state.user.full_name ||
+    state.user.email ||
+    "User";
+
+  userNameEl.textContent = displayName;
+  userAvatarEl.textContent = String(displayName).slice(0, 1).toUpperCase();
+
+  if (loginEntryBtn) loginEntryBtn.style.display = "none";
+  if (logoutBtn) logoutBtn.style.display = "none";
+}
+
+function renderAdminNav() {
+  const adminNav = document.getElementById("adminNavItem");
+  if (!adminNav) return;
+
+  const isAllowed =
+    state.user?.role === "admin" ||
+    state.user?.isAdmin === true;
+
+  adminNav.style.display = isAllowed ? "inline-flex" : "none";
+
+  if (!isAllowed && state.currentView === VIEW_TYPES.ADMIN) {
+    state.currentView = VIEW_TYPES.DASHBOARD;
+  }
+}
+
+function syncActiveNav() {
+  document.querySelectorAll(".nav-btn").forEach((button) => {
+    const isActive = button.dataset.view === state.currentView;
+    button.classList.toggle("is-active", isActive);
+  });
+}
+
+function refreshChrome() {
+  updateClock();
+  renderAttendanceStatus();
+  renderTopbarUser();
+  renderAdminNav();
+  syncActiveNav();
+}
+
+function bindAuthModalEvents() {
+  if (authModalBound) return;
+
+  const loginForm = document.getElementById("auth-login-form");
+  const closeBtn = document.getElementById("auth-modal-close-btn");
+
+  closeBtn?.addEventListener("click", () => {
+    closeAuthModal();
+  });
+
+  loginForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const formData = new FormData(loginForm);
+    const email = formData.get("email");
+    const password = formData.get("password");
+
+    const { error } = await signIn(email, password);
+
+    if (error) {
+      showMessage("auth-message", error.message || "登入失敗。", "error");
+      return;
+    }
+
+    closeAuthModal();
+    renderAndBind();
+  });
+
+  authModalBound = true;
+}
+
 async function readJsonFile(file) {
   const text = await file.text();
   return JSON.parse(text);
 }
 
 function bindImportInput(inputEl, messageTargetId = "") {
-  if (!inputEl) return;
+  if (!inputEl || inputEl.dataset.bound === "true") return;
+
+  inputEl.dataset.bound = "true";
 
   inputEl.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
@@ -221,8 +359,12 @@ function bindImportInput(inputEl, messageTargetId = "") {
 
 function bindSidebarEvents() {
   const navButtons = document.querySelectorAll(".nav-btn");
+  if (!navButtons.length) return;
 
   navButtons.forEach((button) => {
+    if (button.dataset.navBound === "true") return;
+
+    button.dataset.navBound = "true";
     button.addEventListener("click", () => {
       const view = button.dataset.view;
 
@@ -237,6 +379,15 @@ function bindSidebarEvents() {
       } else if (view === VIEW_TYPES.ANNOUNCEMENTS) {
         state.currentView = VIEW_TYPES.ANNOUNCEMENTS;
       } else if (view === VIEW_TYPES.ADMIN) {
+        const isAllowed =
+          state.user?.role === "admin" ||
+          state.user?.isAdmin === true;
+
+        if (!isAllowed) {
+          window.alert("只有管理員可以進入此頁面");
+          return;
+        }
+
         state.currentView = VIEW_TYPES.ADMIN;
       } else if (view === VIEW_TYPES.SETTINGS) {
         state.currentView = VIEW_TYPES.SETTINGS;
@@ -244,12 +395,11 @@ function bindSidebarEvents() {
         state.currentView = VIEW_TYPES.DASHBOARD;
       }
 
-      navButtons.forEach((btn) => btn.classList.remove("is-active"));
-      button.classList.add("is-active");
-
       renderAndBind();
     });
   });
+
+  sidebarNavBound = true;
 }
 
 function bindDashboardEvents() {
@@ -261,44 +411,54 @@ function bindDashboardEvents() {
   const exportJsonBtn = document.getElementById("export-json-btn");
   const importJsonInput = document.getElementById("import-json-input");
 
-  if (clockInBtn) {
+  if (clockInBtn && clockInBtn.dataset.bound !== "true") {
+    clockInBtn.dataset.bound = "true";
+
     clockInBtn.addEventListener("click", async () => {
-        try {
+      if (!requireLogin("請先登入後再進行上班打卡。")) return;
+
+      try {
         const position = await getCurrentPositionAsync();
         const fence = evaluateGeofence(position, state.settings);
 
         if (!fence.allowed) {
-            showMessage(
+          showMessage(
             "action-message",
             `目前不在公司打卡範圍內，距離約 ${Math.round(fence.distanceMeters)} 公尺。`,
             "error"
-            );
-            return;
+          );
+          return;
         }
 
-        // 這裡先保留你原本 clockIn 流程
         const result = clockIn(new Date());
-
         renderAndBind();
         showMessage("action-message", result.message, result.ok ? "success" : "error");
-        } catch (error) {
+      } catch (error) {
         console.error(error);
         showMessage("action-message", "無法取得定位，請確認已開啟定位權限。", "error");
-        }
+      }
     });
-    }
+  }
 
-  if (clockOutBtn) {
+  if (clockOutBtn && clockOutBtn.dataset.bound !== "true") {
+    clockOutBtn.dataset.bound = "true";
+
     clockOutBtn.addEventListener("click", () => {
+      if (!requireLogin("請先登入後再進行下班打卡。")) return;
+
       const result = clockOut(new Date());
       renderAndBind();
       showMessage("action-message", result.message, result.ok ? "success" : "error");
     });
   }
 
-  if (manualForm) {
+  if (manualForm && manualForm.dataset.bound !== "true") {
+    manualForm.dataset.bound = "true";
+
     manualForm.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (!requireLogin("請先登入後再新增補登紀錄。")) return;
+
       clearMessage("manual-message");
 
       const formData = new FormData(manualForm);
@@ -314,9 +474,13 @@ function bindDashboardEvents() {
     });
   }
 
-  if (statusForm) {
+  if (statusForm && statusForm.dataset.bound !== "true") {
+    statusForm.dataset.bound = "true";
+
     statusForm.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (!requireLogin("請先登入後再新增狀態紀錄。")) return;
+
       clearMessage("status-message");
 
       const formData = new FormData(statusForm);
@@ -331,14 +495,18 @@ function bindDashboardEvents() {
     });
   }
 
-  if (exportBtn) {
+  if (exportBtn && exportBtn.dataset.bound !== "true") {
+    exportBtn.dataset.bound = "true";
+
     exportBtn.addEventListener("click", () => {
       exportAttendanceCSV();
       showMessage("status-message", "CSV 已匯出。", "success");
     });
   }
 
-  if (exportJsonBtn) {
+  if (exportJsonBtn && exportJsonBtn.dataset.bound !== "true") {
+    exportJsonBtn.dataset.bound = "true";
+
     exportJsonBtn.addEventListener("click", () => {
       exportAttendanceJSON();
       showMessage("manual-message", "JSON 備份已匯出。", "success");
@@ -382,6 +550,9 @@ function bindHistoryEvents() {
   const keywordInput = document.getElementById("filter-keyword");
 
   deleteButtons.forEach((button) => {
+    if (button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+
     button.addEventListener("click", () => {
       const { id } = button.dataset;
       deleteRecord(id);
@@ -390,18 +561,21 @@ function bindHistoryEvents() {
   });
 
   openEditButtons.forEach((button) => {
+    if (button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+
     button.addEventListener("click", () => {
       fillEditFormFromButton(button);
       clearMessage("edit-record-message");
 
       const formCard = document.getElementById("record-edit-form");
-      if (formCard) {
-        formCard.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+      formCard?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   });
 
-  if (editForm) {
+  if (editForm && editForm.dataset.bound !== "true") {
+    editForm.dataset.bound = "true";
+
     editForm.addEventListener("submit", (event) => {
       event.preventDefault();
 
@@ -424,7 +598,9 @@ function bindHistoryEvents() {
     });
   }
 
-  if (clearAllBtn) {
+  if (clearAllBtn && clearAllBtn.dataset.bound !== "true") {
+    clearAllBtn.dataset.bound = "true";
+
     clearAllBtn.addEventListener("click", () => {
       const confirmed = window.confirm("確定要清空所有打卡紀錄嗎？");
       if (!confirmed) return;
@@ -436,13 +612,15 @@ function bindHistoryEvents() {
     });
   }
 
-  if (exportBtn) {
+  if (exportBtn && exportBtn.dataset.bound !== "true") {
+    exportBtn.dataset.bound = "true";
     exportBtn.addEventListener("click", () => {
       exportAttendanceCSV();
     });
   }
 
-  if (exportJsonBtn) {
+  if (exportJsonBtn && exportJsonBtn.dataset.bound !== "true") {
+    exportJsonBtn.dataset.bound = "true";
     exportJsonBtn.addEventListener("click", () => {
       exportAttendanceJSON();
     });
@@ -450,14 +628,16 @@ function bindHistoryEvents() {
 
   bindImportInput(importJsonInput);
 
-  if (monthSelect) {
+  if (monthSelect && monthSelect.dataset.bound !== "true") {
+    monthSelect.dataset.bound = "true";
     monthSelect.addEventListener("change", () => {
       state.filters.month = monthSelect.value;
       renderAndBind();
     });
   }
 
-  if (keywordInput) {
+  if (keywordInput && keywordInput.dataset.bound !== "true") {
+    keywordInput.dataset.bound = "true";
     keywordInput.addEventListener("input", () => {
       state.filters.keyword = keywordInput.value;
       renderAndBind();
@@ -470,7 +650,9 @@ function bindSettingsEvents() {
   const resetBtn = document.getElementById("reset-settings-btn");
   const setOfficeLocationBtn = document.getElementById("set-office-current-location-btn");
 
-  if (settingsForm) {
+  if (settingsForm && settingsForm.dataset.bound !== "true") {
+    settingsForm.dataset.bound = "true";
+
     settingsForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
@@ -499,7 +681,9 @@ function bindSettingsEvents() {
     });
   }
 
-  if (resetBtn) {
+  if (resetBtn && resetBtn.dataset.bound !== "true") {
+    resetBtn.dataset.bound = "true";
+
     resetBtn.addEventListener("click", async () => {
       if (!state.user) {
         openAuthModal();
@@ -513,7 +697,9 @@ function bindSettingsEvents() {
     });
   }
 
-  if (setOfficeLocationBtn) {
+  if (setOfficeLocationBtn && setOfficeLocationBtn.dataset.bound !== "true") {
+    setOfficeLocationBtn.dataset.bound = "true";
+
     setOfficeLocationBtn.addEventListener("click", async () => {
       try {
         const position = await getCurrentPositionAsync();
@@ -536,7 +722,9 @@ function bindSettingsEvents() {
 function bindReportsEvents() {
   const reportMonthSelect = document.getElementById("report-month-select");
 
-  if (reportMonthSelect) {
+  if (reportMonthSelect && reportMonthSelect.dataset.bound !== "true") {
+    reportMonthSelect.dataset.bound = "true";
+
     reportMonthSelect.addEventListener("change", () => {
       state.filters.month = reportMonthSelect.value;
       renderAndBind();
@@ -565,6 +753,7 @@ function bindViewEvents() {
 
 function renderAndBind() {
   renderApp();
+  refreshChrome();
   bindViewEvents();
 }
 
@@ -581,14 +770,31 @@ async function bootstrap() {
   bindSidebarEvents();
   bindSidebarToggle();
   bindAuthModalEvents();
+  bindUserMenu();
+  bindTopbarActions();
 
-  startClock(() => {
-    if (state.currentView === VIEW_TYPES.DASHBOARD) {
-      renderAndBind();
-    }
-  });
+  if (!clockInitialized) {
+    updateClock();
+    startClock(() => {
+      updateClock();
+
+      if (state.currentView === VIEW_TYPES.DASHBOARD) {
+        renderAndBind();
+      } else {
+        refreshChrome();
+      }
+    });
+
+    clockInitialized = true;
+  }
+
+  if (!state.user) {
+    openAuthModal();
+  }
 }
 
-bootstrap();
-
-bootstrap();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootstrap);
+} else {
+  bootstrap();
+}
