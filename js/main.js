@@ -9,12 +9,15 @@ function $(selector) {
   return document.querySelector(selector);
 }
 
-function bindSidebarToggle() {
+export function bindSidebarToggle() {
   const btn = document.getElementById("menuToggleBtn");
   const sidebar = document.querySelector(".sidebar");
   const overlay = document.getElementById("sidebarOverlay");
 
-  if (!btn || !sidebar || !overlay) return;
+  if (!btn || !sidebar || !overlay) {
+    console.log("sidebar toggle 元素沒抓到", { btn, sidebar, overlay });
+    return;
+  }
 
   btn.addEventListener("click", () => {
     sidebar.classList.add("open");
@@ -24,6 +27,13 @@ function bindSidebarToggle() {
   overlay.addEventListener("click", () => {
     sidebar.classList.remove("open");
     overlay.classList.remove("show");
+  });
+
+  document.querySelectorAll(".sidebar .nav-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      sidebar.classList.remove("open");
+      overlay.classList.remove("show");
+    });
   });
 }
 
