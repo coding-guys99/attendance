@@ -1,7 +1,7 @@
-import { VIEW_TYPES } from "./constants.js";
+import { VIEW_TYPES } from "./core/constants.js";
 import { login, logout, isAdmin, requireLogin } from "./auth.js";
 import { checkIn, checkOut, getTodayRecordByUser } from "./attendance.js";
-import { getCurrentUser, initStorage } from "./storage.js";
+import { getCurrentUser, initStorage } from "./ui/view/storage.js";
 
 let currentView = VIEW_TYPES.DASHBOARD;
 
