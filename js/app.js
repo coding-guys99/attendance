@@ -29,6 +29,24 @@ import {
   signIn,
 } from "./modules/auth/auth.service.js";
 
+function bindSidebarToggle() {
+  const btn = document.getElementById("menuToggleBtn");
+  const sidebar = document.querySelector(".sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+
+  if (!btn || !sidebar || !overlay) return;
+
+  btn.addEventListener("click", () => {
+    sidebar.classList.add("open");
+    overlay.classList.add("show");
+  });
+
+  overlay.addEventListener("click", () => {
+    sidebar.classList.remove("open");
+    overlay.classList.remove("show");
+  });
+}
+
 function openAuthModal() {
   const modal = document.getElementById("auth-modal");
   if (!modal) return;
