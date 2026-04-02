@@ -1,4 +1,4 @@
-import { DEFAULT_USERS, STORAGE_KEYS } from "./core/constants.js";
+import { DEFAULT_USERS, STORAGE_KEYS } from "../core/constants.js";
 
 export function readJSON(key, fallback) {
   try {
