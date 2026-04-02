@@ -9,7 +9,6 @@ import {
   findRecordByDate,
   buildManualCompletedRecord,
 } from "./attendance.utils.js";
-
 import { mapRecordFromDb, mapRecordToDb } from "./attendance.mapper.js";
 
 import { generateId } from "../../utils/id.js";
@@ -35,7 +34,9 @@ function upsertLocalRecord(record) {
   const exists = state.records.some((item) => item.id === record.id);
 
   if (exists) {
-    commitRecords(state.records.map((item) => (item.id === record.id ? record : item)));
+    commitRecords(
+      state.records.map((item) => (item.id === record.id ? record : item))
+    );
     return;
   }
 
@@ -56,7 +57,6 @@ export function initializeAttendance() {
     ...item,
   }));
 
-  // 若已登入，背景同步 Supabase 資料
   if (isLoggedIn()) {
     fetchAttendanceRecords().catch((error) => {
       console.error("fetchAttendanceRecords failed:", error);
@@ -174,11 +174,11 @@ export async function clockIn(now = new Date()) {
 
   const dayRule = getDayRule(now);
 
-const record = {
-  ...createClockInRecord(now),
-  dayType: dayRule.type,
-  dayLabel: dayRule.label,
-};
+  const record = {
+    ...createClockInRecord(now),
+    dayType: dayRule.type,
+    dayLabel: dayRule.label,
+  };
 
   try {
     const savedRecord = await createAttendanceRecord(record);
@@ -215,6 +215,8 @@ export async function clockOut(now = new Date()) {
       work_seconds: updated.workSeconds,
       status: updated.status,
       note: updated.note || "",
+      day_type: updated.dayType || null,
+      day_label: updated.dayLabel || null,
       updated_at: new Date().toISOString(),
     });
 
@@ -226,19 +228,6 @@ export async function clockOut(now = new Date()) {
 }
 
 export function createManualRecord({
-const dayRule = getDayRule(clockInDate);
-
-const record = buildManualCompletedRecord({
-  id: generateId(),
-  date: dateKey,
-  clockInISO: clockInDate.toISOString(),
-  clockOutISO: clockOutDate.toISOString(),
-  note: note.trim(),
-  type,
-});
-
-record.dayType = dayRule.type;
-record.dayLabel = dayRule.label;
   clockInValue,
   clockOutValue,
   note = "",
@@ -251,7 +240,10 @@ record.dayLabel = dayRule.label;
   const clockInDate = new Date(clockInValue);
   const clockOutDate = new Date(clockOutValue);
 
-  if (Number.isNaN(clockInDate.getTime()) || Number.isNaN(clockOutDate.getTime())) {
+  if (
+    Number.isNaN(clockInDate.getTime()) ||
+    Number.isNaN(clockOutDate.getTime())
+  ) {
     return { ok: false, message: "補卡時間格式不正確。" };
   }
 
@@ -270,6 +262,8 @@ record.dayLabel = dayRule.label;
     return { ok: false, message: "該日期已有紀錄，不能重複補卡。" };
   }
 
+  const dayRule = getDayRule(clockInDate);
+
   const record = buildManualCompletedRecord({
     id: generateId(),
     date: dateKey,
@@ -279,25 +273,15 @@ record.dayLabel = dayRule.label;
     type,
   });
 
+  record.dayType = dayRule.type;
+  record.dayLabel = dayRule.label;
+
   upsertLocalRecord(record);
 
   return { ok: true, message: "補卡成功。", record };
 }
 
 export function createStatusRecord({ dateValue, type, note = "" }) {
-  const dayRule = getDayRule(targetDate);
-
-const record = buildManualCompletedRecord({
-  id: generateId(),
-  date: dateKey,
-  clockInISO: start.toISOString(),
-  clockOutISO: end.toISOString(),
-  note: note.trim(),
-  type,
-});
-
-record.dayType = dayRule.type;
-record.dayLabel = dayRule.label;
   if (!dateValue) {
     return { ok: false, message: "請先選擇日期。" };
   }
@@ -315,6 +299,7 @@ record.dayLabel = dayRule.label;
 
   const start = new Date(`${dateKey}T09:00:00`);
   const end = new Date(`${dateKey}T18:00:00`);
+  const dayRule = getDayRule(targetDate);
 
   const record = buildManualCompletedRecord({
     id: generateId(),
@@ -324,6 +309,9 @@ record.dayLabel = dayRule.label;
     note: note.trim(),
     type,
   });
+
+  record.dayType = dayRule.type;
+  record.dayLabel = dayRule.label;
 
   upsertLocalRecord(record);
 
@@ -349,7 +337,10 @@ export async function updateFullRecord({
   const clockInDate = new Date(clockInValue);
   const clockOutDate = new Date(clockOutValue);
 
-  if (Number.isNaN(clockInDate.getTime()) || Number.isNaN(clockOutDate.getTime())) {
+  if (
+    Number.isNaN(clockInDate.getTime()) ||
+    Number.isNaN(clockOutDate.getTime())
+  ) {
     return { ok: false, message: "時間格式不正確。" };
   }
 
@@ -370,7 +361,7 @@ export async function updateFullRecord({
   if (duplicate) {
     return { ok: false, message: "該日期已有其他紀錄，不能重複。" };
   }
-  
+
   const dayRule = getDayRule(clockInDate);
 
   const updated = {
@@ -381,11 +372,14 @@ export async function updateFullRecord({
     clockOut: clockOutDate.toISOString(),
     workSeconds:
       type === RECORD_TYPES.WORK
-        ? getSecondsBetween(clockInDate.toISOString(), clockOutDate.toISOString())
+        ? getSecondsBetween(
+            clockInDate.toISOString(),
+            clockOutDate.toISOString()
+          )
         : 0,
     status: ATTENDANCE_STATUS.COMPLETED,
     dayType: dayRule.type,
-dayLabel: dayRule.label,
+    dayLabel: dayRule.label,
     note: note.trim(),
     createdAt: clockInDate.toISOString(),
     updatedAt: new Date().toISOString(),
@@ -401,6 +395,8 @@ dayLabel: dayRule.label,
         work_seconds: updated.workSeconds,
         status: updated.status,
         note: updated.note,
+        day_type: updated.dayType,
+        day_label: updated.dayLabel,
         updated_at: new Date().toISOString(),
       });
 
@@ -431,6 +427,8 @@ export function importRecordsFromJSON(records) {
       workSeconds: Number(item.workSeconds || 0),
       status: item.status || ATTENDANCE_STATUS.COMPLETED,
       note: item.note || "",
+      dayType: item.dayType || null,
+      dayLabel: item.dayLabel || null,
       createdAt: item.createdAt || item.clockIn || new Date().toISOString(),
       updatedAt: item.updatedAt || new Date().toISOString(),
     }));
@@ -467,7 +465,9 @@ export async function createClockInRecordWithLocation(record, userPosition) {
   if (!fence.allowed) {
     return {
       ok: false,
-      message: `你目前不在公司打卡範圍內，距離約 ${Math.round(fence.distanceMeters)} 公尺。`,
+      message: `你目前不在公司打卡範圍內，距離約 ${Math.round(
+        fence.distanceMeters
+      )} 公尺。`,
     };
   }
 
@@ -480,6 +480,8 @@ export async function createClockInRecordWithLocation(record, userPosition) {
     work_seconds: record.workSeconds,
     status: record.status,
     note: record.note || "",
+    day_type: record.dayType || null,
+    day_label: record.dayLabel || null,
     clock_in_latitude: userPosition.latitude,
     clock_in_longitude: userPosition.longitude,
     clock_in_accuracy: userPosition.accuracy,
@@ -519,7 +521,9 @@ export async function clockOutWithLocation(recordId, userPosition) {
   if (!fence.allowed) {
     return {
       ok: false,
-      message: `你目前不在公司打卡範圍內，距離約 ${Math.round(fence.distanceMeters)} 公尺。`,
+      message: `你目前不在公司打卡範圍內，距離約 ${Math.round(
+        fence.distanceMeters
+      )} 公尺。`,
     };
   }
 
