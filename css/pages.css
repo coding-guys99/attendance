@@ -128,3 +128,47 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.admin-page {
+  display: grid;
+  gap: 20px;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-table {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.admin-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 100px 120px 120px;
+  padding: 14px 16px;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.admin-row--head {
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.admin-row:last-child {
+  border-bottom: none;
+}
+
+.btn-delete {
+  border: none;
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
