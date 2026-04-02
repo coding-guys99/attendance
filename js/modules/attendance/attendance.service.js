@@ -297,7 +297,7 @@ export function createStatusRecord({ dateValue, type, note = "" }) {
   return { ok: true, message: "狀態紀錄已新增。", record };
 }
 
-export function updateFullRecord({
+export async function updateFullRecord({
   recordId,
   clockInValue,
   clockOutValue,
@@ -325,6 +325,7 @@ export function updateFullRecord({
   }
 
   const dateKey = getDateKey(clockInDate);
+
   if (getDateKey(clockOutDate) !== dateKey) {
     return { ok: false, message: "目前只支援同一天內的編輯紀錄。" };
   }
@@ -332,6 +333,7 @@ export function updateFullRecord({
   const duplicate = state.records.find(
     (item) => item.id !== recordId && item.date === dateKey
   );
+
   if (duplicate) {
     return { ok: false, message: "該日期已有其他紀錄，不能重複。" };
   }
@@ -352,9 +354,28 @@ export function updateFullRecord({
     updatedAt: new Date().toISOString(),
   };
 
-  upsertLocalRecord(updated);
+  try {
+    if (isLoggedIn()) {
+      const savedRecord = await updateAttendanceRecord(recordId, {
+        date: updated.date,
+        type: updated.type,
+        clock_in: updated.clockIn,
+        clock_out: updated.clockOut,
+        work_seconds: updated.workSeconds,
+        status: updated.status,
+        note: updated.note,
+        updated_at: new Date().toISOString(),
+      });
 
-  return { ok: true, message: "紀錄已更新。", record: updated };
+      return { ok: true, message: "紀錄已更新。", record: savedRecord };
+    }
+
+    upsertLocalRecord(updated);
+    return { ok: true, message: "紀錄已更新。", record: updated };
+  } catch (error) {
+    console.error("updateFullRecord error:", error);
+    return { ok: false, message: error.message || "更新紀錄失敗。" };
+  }
 }
 
 export function importRecordsFromJSON(records) {
