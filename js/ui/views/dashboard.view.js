@@ -16,6 +16,7 @@ import {
 import { getSecondsBetween } from "../../utils/time.js";
 import { toLocalDatetimeValue, getDateKey } from "../../utils/date.js";
 import { getAttendanceAnalysis } from "../../utils/attendance-status.js";
+import { getDayRule } from "../../modules/calendar/calendar-rules.js";
 
 function getTodayWorkDuration(todayRecord, now) {
   if (!todayRecord) return "00:00:00";
@@ -122,6 +123,7 @@ function getDashboardReminder(todayRecord, now) {
 }
 
 export function renderDashboardView() {
+  const todayRule = getDayRule(new Date());
   const now = state.now;
   const todayRecord = getTodayRecord(now);
   const summary = getHistorySummary(now);
@@ -181,6 +183,7 @@ export function renderDashboardView() {
         <div>
           <p class="notice-card__title">${reminder.title}</p>
           <p class="notice-card__text">${reminder.text}</p>
+          <p>今日類型：${todayRule.label}</p>
         </div>
       </div>
 
