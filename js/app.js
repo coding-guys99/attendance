@@ -168,15 +168,29 @@ function bindTopbarActions() {
     openAuthModal();
   });
 
-  document.getElementById("logoutBtn")?.addEventListener("click", () => {
-    showMessage("auth-message", "目前尚未接上登出功能。", "error");
-    openAuthModal();
-  });
+  async function handleLogout() {
+    const { error } = await signOut();
 
-  document.getElementById("logoutBtnDropdown")?.addEventListener("click", () => {
-    showMessage("auth-message", "目前尚未接上登出功能。", "error");
+    if (error) {
+      console.error("signOut error:", error);
+      window.alert(error.message || "登出失敗");
+      return;
+    }
+
+    closeSidebar();
+    closeAuthModal();
+
+    state.currentView = VIEW_TYPES.DASHBOARD;
+    state.records = [];
+
+    renderAndBind();
     openAuthModal();
-  });
+  }
+
+  document.getElementById("logoutBtn")?.addEventListener("click", handleLogout);
+  document
+    .getElementById("logoutBtnDropdown")
+    ?.addEventListener("click", handleLogout);
 
   topbarActionsBound = true;
 }
@@ -240,25 +254,25 @@ function renderTopbarUser() {
   if (!userNameEl || !userAvatarEl) return;
 
   if (!state.user) {
-    userNameEl.textContent = "未登入";
-    userAvatarEl.textContent = "?";
+  userNameEl.textContent = "未登入";
+  userAvatarEl.textContent = "?";
 
-    if (loginEntryBtn) loginEntryBtn.style.display = "inline-flex";
-    if (logoutBtn) logoutBtn.style.display = "none";
-    return;
-  }
-
-  const displayName =
-    state.user.name ||
-    state.user.full_name ||
-    state.user.email ||
-    "User";
-
-  userNameEl.textContent = displayName;
-  userAvatarEl.textContent = String(displayName).slice(0, 1).toUpperCase();
-
-  if (loginEntryBtn) loginEntryBtn.style.display = "none";
+  if (loginEntryBtn) loginEntryBtn.style.display = "inline-flex";
   if (logoutBtn) logoutBtn.style.display = "none";
+  return;
+}
+
+const displayName =
+  state.user.name ||
+  state.user.full_name ||
+  state.user.email ||
+  "User";
+
+userNameEl.textContent = displayName;
+userAvatarEl.textContent = String(displayName).slice(0, 1).toUpperCase();
+
+if (loginEntryBtn) loginEntryBtn.style.display = "none";
+if (logoutBtn) logoutBtn.style.display = "inline-flex";
 }
 
 function renderAdminNav() {
