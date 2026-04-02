@@ -1,4 +1,4 @@
-import { getUsers, saveUsers } from "../../core/storage.js";
+import { getUsers, saveUsers } from "./storage.js";
 import { USER_ROLES } from "../../core/constants.js";
 
 function escapeHTML(value = "") {
