@@ -13,6 +13,7 @@ import {
 } from "./storage.js";
 
 let currentView = VIEW_TYPES.DASHBOARD;
+let sidebarToggleBound = false;
 
 function $(selector) {
   return document.querySelector(selector);
@@ -42,6 +43,7 @@ function closeLoginPanel() {
   const messageEl = document.getElementById("auth-message");
   if (messageEl) {
     messageEl.textContent = "";
+    messageEl.className = "message-box";
   }
 }
 
@@ -155,6 +157,9 @@ function bindLoginForm() {
   const form = document.getElementById("auth-login-form");
   if (!form) return;
 
+  if (form.dataset.bound === "true") return;
+  form.dataset.bound = "true";
+
   form.addEventListener("submit", (event) => {
     event.preventDefault();
 
@@ -168,6 +173,7 @@ function bindLoginForm() {
     if (!result.ok) {
       if (messageEl) {
         messageEl.textContent = result.message;
+        messageEl.className = "message-box is-visible message-box--error";
       }
       return;
     }
@@ -231,6 +237,13 @@ function bindAttendanceActions() {
   });
 }
 
+function closeSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  sidebar?.classList.remove("open");
+  overlay?.classList.remove("show");
+}
+
 function bindSidebarToggle() {
   const btn = document.getElementById("menuToggleBtn");
   const sidebar = document.getElementById("sidebar");
@@ -238,35 +251,38 @@ function bindSidebarToggle() {
 
   console.log("bindSidebarToggle init", { btn, sidebar, overlay });
 
-  if (!btn || !sidebar || !overlay) return;
+  if (!btn || !sidebar || !overlay) {
+    return false;
+  }
 
-  btn.onclick = null;
+  if (!sidebarToggleBound) {
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
 
-  btn.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
+      sidebar.classList.toggle("open");
+      overlay.classList.toggle("show");
 
-    console.log("menu button clicked before:", sidebar.className, overlay.className);
+      console.log("menu toggle:", sidebar.className, overlay.className);
+    });
 
-    sidebar.classList.toggle("open");
-    overlay.classList.toggle("show");
+    overlay.addEventListener("click", () => {
+      closeSidebar();
+    });
 
-    console.log("menu button clicked after:", sidebar.className, overlay.className);
-  });
-
-  overlay.addEventListener("click", () => {
-    console.log("overlay clicked");
-    sidebar.classList.remove("open");
-    overlay.classList.remove("show");
-  });
+    sidebarToggleBound = true;
+  }
 
   document.querySelectorAll(".sidebar .nav-btn").forEach((button) => {
+    if (button.dataset.sidebarBound === "true") return;
+
+    button.dataset.sidebarBound = "true";
     button.addEventListener("click", () => {
-      console.log("nav clicked");
-      sidebar.classList.remove("open");
-      overlay.classList.remove("show");
+      closeSidebar();
     });
   });
+
+  return true;
 }
 
 function renderDashboardView() {
@@ -392,6 +408,9 @@ function renderAdminView() {
 
 function bindAdminActions() {
   document.querySelectorAll(".toggle-active").forEach((input) => {
+    if (input.dataset.bound === "true") return;
+    input.dataset.bound = "true";
+
     input.addEventListener("change", () => {
       const users = getUsers();
       const id = input.dataset.id;
@@ -404,6 +423,9 @@ function bindAdminActions() {
   });
 
   document.querySelectorAll(".toggle-checkin").forEach((input) => {
+    if (input.dataset.bound === "true") return;
+    input.dataset.bound = "true";
+
     input.addEventListener("change", () => {
       const users = getUsers();
       const id = input.dataset.id;
@@ -416,6 +438,9 @@ function bindAdminActions() {
   });
 
   document.querySelectorAll(".btn-delete").forEach((btn) => {
+    if (btn.dataset.bound === "true") return;
+    btn.dataset.bound = "true";
+
     btn.addEventListener("click", () => {
       const users = getUsers();
       const id = btn.dataset.id;
@@ -426,29 +451,46 @@ function bindAdminActions() {
     });
   });
 
-  document.getElementById("addUserBtn")?.addEventListener("click", () => {
-    const users = getUsers();
+  const addUserBtn = document.getElementById("addUserBtn");
+  if (addUserBtn && addUserBtn.dataset.bound !== "true") {
+    addUserBtn.dataset.bound = "true";
 
-    const name = prompt("姓名");
-    const username = prompt("帳號");
-    const password = prompt("密碼");
+    addUserBtn.addEventListener("click", () => {
+      const users = getUsers();
 
-    if (!name || !username || !password) return;
+      const name = prompt("姓名");
+      const username = prompt("帳號");
+      const password = prompt("密碼");
 
-    users.push({
-      id: `u_${Date.now()}`,
-      name,
-      username,
-      password,
-      role: "employee",
-      department: "未設定",
-      isActive: true,
-      canCheckIn: true,
+      if (!name || !username || !password) return;
+
+      users.push({
+        id: `u_${Date.now()}`,
+        name,
+        username,
+        password,
+        role: "employee",
+        department: "未設定",
+        isActive: true,
+        canCheckIn: true,
+      });
+
+      saveUsers(users);
+      renderAdminView();
     });
+  }
+}
 
-    saveUsers(users);
-    renderAdminView();
-  });
+function renderPlaceholderView(title) {
+  const appView = document.getElementById("app-view");
+  if (!appView) return;
+
+  appView.innerHTML = `
+    <section class="card">
+      <h3>${title}</h3>
+      <p>此頁待接。</p>
+    </section>
+  `;
 }
 
 function renderCurrentView() {
@@ -457,34 +499,22 @@ function renderCurrentView() {
       renderAdminView();
       break;
     case VIEW_TYPES.HISTORY:
-      document.getElementById("app-view").innerHTML = `
-        <section class="card"><h3>歷史紀錄</h3><p>此頁待接。</p></section>
-      `;
+      renderPlaceholderView("歷史紀錄");
       break;
     case VIEW_TYPES.REPORTS:
-      document.getElementById("app-view").innerHTML = `
-        <section class="card"><h3>月報表</h3><p>此頁待接。</p></section>
-      `;
+      renderPlaceholderView("月報表");
       break;
     case VIEW_TYPES.LEAVE:
-      document.getElementById("app-view").innerHTML = `
-        <section class="card"><h3>請假</h3><p>此頁待接。</p></section>
-      `;
+      renderPlaceholderView("請假");
       break;
     case VIEW_TYPES.NOTIFICATIONS:
-      document.getElementById("app-view").innerHTML = `
-        <section class="card"><h3>通知</h3><p>此頁待接。</p></section>
-      `;
+      renderPlaceholderView("通知");
       break;
     case VIEW_TYPES.ANNOUNCEMENTS:
-      document.getElementById("app-view").innerHTML = `
-        <section class="card"><h3>公告</h3><p>此頁待接。</p></section>
-      `;
+      renderPlaceholderView("公告");
       break;
     case VIEW_TYPES.SETTINGS:
-      document.getElementById("app-view").innerHTML = `
-        <section class="card"><h3>設定</h3><p>此頁待接。</p></section>
-      `;
+      renderPlaceholderView("設定");
       break;
     case VIEW_TYPES.DASHBOARD:
     default:
@@ -495,6 +525,9 @@ function renderCurrentView() {
 
 function bindSidebarNav() {
   document.querySelectorAll("[data-view]").forEach((button) => {
+    if (button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+
     button.addEventListener("click", () => {
       const nextView = button.dataset.view;
 
@@ -514,7 +547,9 @@ function bindSidebarNav() {
   });
 }
 
-function init() {
+function initApp() {
+  console.log("MAIN JS INIT");
+
   initStorage();
   updateClock();
   setInterval(updateClock, 1000);
@@ -522,14 +557,24 @@ function init() {
   bindLoginForm();
   bindTopbarActions();
   bindSidebarNav();
-  bindSidebarToggle();
 
   renderAuthUI();
   renderCurrentView();
+
+  const bound = bindSidebarToggle();
+  if (!bound) {
+    requestAnimationFrame(() => {
+      bindSidebarToggle();
+    });
+  }
 
   if (!getCurrentUser()) {
     openLoginPanel();
   }
 }
 
-init();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initApp);
+} else {
+  initApp();
+}
