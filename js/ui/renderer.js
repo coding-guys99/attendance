@@ -7,7 +7,7 @@ import { renderReportsView } from "./views/reports.view.js";
 import { renderLeaveView } from "./views/leave.view.js";
 import { renderNotificationsView } from "./views/notifications.view.js";
 import { renderAnnouncementsView } from "./views/announcements.view.js";
-import { renderAdminView } from "./views/admin.view.js";
+import { renderAdminView, bindAdminActions } from "./views/admin.view.js";
 import { renderSettingsView } from "./views/settings.view.js";
 
 export function renderApp() {
