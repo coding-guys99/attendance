@@ -144,7 +144,7 @@ export async function updateAttendanceRecord(recordId, updates) {
 export async function deleteAttendanceRecord(recordId) {
   if (!isLoggedIn()) {
     removeLocalRecord(recordId);
-    return;
+    return { ok: true };
   }
 
   const { error } = await supabase
@@ -153,10 +153,14 @@ export async function deleteAttendanceRecord(recordId) {
     .eq("id", recordId)
     .eq("user_id", state.user.id);
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 
   removeLocalRecord(recordId);
   replaceAllRecords(state.records);
+
+  return { ok: true };
 }
 
 export async function clockIn(now = new Date()) {
