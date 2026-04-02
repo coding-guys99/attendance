@@ -35,6 +35,7 @@ import { getCurrentPositionAsync, evaluateGeofence } from "./utils/geofence.js";
 import {
   initializeAuth,
   signIn,
+  signOut,
 } from "./modules/auth/auth.service.js";
 
 let sidebarToggleBound = false;
