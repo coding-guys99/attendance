@@ -1,7 +1,7 @@
 import { state } from "./core/state.js";
 import { VIEW_TYPES } from "./core/constants.js";
 import { renderApp } from "./ui/renderer.js";
-import { fetchAttendanceRecords } from "./modules/attendance/attendance.service.js";
+
 
 import {
   initializeAttendance,
