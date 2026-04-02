@@ -6,7 +6,11 @@ import {
   getRecent7DaysTrend,
 } from "../../modules/history/history.service.js";
 import { state } from "../../core/state.js";
-import { ATTENDANCE_STATUS, RECORD_TYPES, RECORD_TYPE_LABELS } from "../../core/constants.js";
+import {
+  ATTENDANCE_STATUS,
+  RECORD_TYPES,
+  RECORD_TYPE_LABELS,
+} from "../../core/constants.js";
 import {
   formatDate,
   formatTime,
@@ -23,7 +27,10 @@ function getTodayWorkDuration(todayRecord, now) {
 
   if (todayRecord.type !== RECORD_TYPES.WORK) return "--:--:--";
 
-  if (todayRecord.status === ATTENDANCE_STATUS.WORKING) {
+  if (
+    todayRecord.status === ATTENDANCE_STATUS.WORKING &&
+    todayRecord.clockIn
+  ) {
     const seconds = getSecondsBetween(todayRecord.clockIn, now.toISOString());
     return formatDuration(seconds);
   }
@@ -37,7 +44,7 @@ function getStatusPill(todayRecord) {
   }
 
   if (todayRecord.type !== RECORD_TYPES.WORK) {
-    return `<span class="status-pill status-pill--done">${RECORD_TYPE_LABELS[todayRecord.type]}</span>`;
+    return `<span class="status-pill status-pill--done">${RECORD_TYPE_LABELS[todayRecord.type] || "狀態紀錄"}</span>`;
   }
 
   if (todayRecord.status === ATTENDANCE_STATUS.WORKING) {
@@ -47,16 +54,29 @@ function getStatusPill(todayRecord) {
   return `<span class="status-pill status-pill--done">今日已完成</span>`;
 }
 
-function renderTrendChart(data) {
+function renderTrendChart(data = []) {
+  if (!Array.isArray(data) || data.length === 0) {
+    return `
+      <div class="empty-state">
+        目前近 7 天尚無足夠資料可顯示工時趨勢。
+      </div>
+    `;
+  }
+
   const width = 640;
   const height = 220;
   const padding = 24;
-  const maxValue = Math.max(...data.map((item) => item.seconds), 3600);
+  const maxValue = Math.max(...data.map((item) => item.seconds || 0), 3600);
 
   const points = data.map((item, index) => {
-    const x = padding + (index * (width - padding * 2)) / Math.max(data.length - 1, 1);
+    const x =
+      padding + (index * (width - padding * 2)) / Math.max(data.length - 1, 1);
+
     const y =
-      height - padding - ((item.seconds || 0) / maxValue) * (height - padding * 2);
+      height -
+      padding -
+      ((item.seconds || 0) / maxValue) * (height - padding * 2);
+
     return { ...item, x, y };
   });
 
@@ -76,7 +96,12 @@ function renderTrendChart(data) {
   return `
     <div class="trend-chart">
       <svg viewBox="0 0 ${width} ${height}" class="trend-chart__svg">
-        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}"></line>
+        <line
+          x1="${padding}"
+          y1="${height - padding}"
+          x2="${width - padding}"
+          y2="${height - padding}"
+        ></line>
         <polyline points="${polyline}" fill="none"></polyline>
         ${labels}
       </svg>
@@ -87,7 +112,7 @@ function renderTrendChart(data) {
             (item) => `
             <div class="trend-chart__item">
               <span>${item.label}</span>
-              <strong>${formatDuration(item.seconds)}</strong>
+              <strong>${formatDuration(item.seconds || 0)}</strong>
             </div>
           `
           )
@@ -97,9 +122,22 @@ function renderTrendChart(data) {
   `;
 }
 
-function getDashboardReminder(todayRecord, now) {
+function getDashboardReminder(todayRecord, now, todayRule) {
   const todayKey = getDateKey(now);
+
   if (!todayRecord || todayRecord.date !== todayKey) {
+    if (
+      todayRule?.type === "rest_day" ||
+      todayRule?.type === "regular_day_off" ||
+      todayRule?.type === "national_holiday"
+    ) {
+      return {
+        level: "info",
+        title: `今天是${todayRule.label}`,
+        text: "若今天沒有上班屬正常狀況；若需出勤，可照常打卡並保留紀錄。",
+      };
+    }
+
     return {
       level: "warn",
       title: "今天還沒有任何打卡或狀態紀錄",
@@ -107,7 +145,10 @@ function getDashboardReminder(todayRecord, now) {
     };
   }
 
-  if (todayRecord.type === RECORD_TYPES.WORK && todayRecord.status === ATTENDANCE_STATUS.WORKING) {
+  if (
+    todayRecord.type === RECORD_TYPES.WORK &&
+    todayRecord.status === ATTENDANCE_STATUS.WORKING
+  ) {
     return {
       level: "info",
       title: "今天已上班，但還沒下班打卡",
@@ -123,31 +164,46 @@ function getDashboardReminder(todayRecord, now) {
 }
 
 export function renderDashboardView() {
-  const todayRule = getDayRule(new Date());
-  const now = state.now;
+  const now = state.now instanceof Date ? state.now : new Date();
+  const todayRule = getDayRule(now);
   const todayRecord = getTodayRecord(now);
   const summary = getHistorySummary(now);
   const trendData = getRecent7DaysTrend(now);
-  const analysis = todayRecord?.clockOut ? getAttendanceAnalysis(todayRecord) : null;
-  const reminder = getDashboardReminder(todayRecord, now);
+  const analysis =
+    todayRecord?.clockOut && todayRecord?.type === RECORD_TYPES.WORK
+      ? getAttendanceAnalysis(todayRecord)
+      : null;
+
+  const reminder = getDashboardReminder(todayRecord, now, todayRule);
 
   const canClockIn = !todayRecord;
-  const canClockOut = !!todayRecord && todayRecord.type === RECORD_TYPES.WORK && todayRecord.status === ATTENDANCE_STATUS.WORKING;
+  const canClockOut =
+    !!todayRecord &&
+    todayRecord.type === RECORD_TYPES.WORK &&
+    todayRecord.status === ATTENDANCE_STATUS.WORKING;
 
-  const clockInText = todayRecord?.clockIn ? formatDateTime(todayRecord.clockIn) : "尚未打卡";
-  const clockOutText = todayRecord?.clockOut ? formatDateTime(todayRecord.clockOut) : "尚未打卡";
+  const clockInText = todayRecord?.clockIn
+    ? formatDateTime(todayRecord.clockIn)
+    : "尚未打卡";
+
+  const clockOutText = todayRecord?.clockOut
+    ? formatDateTime(todayRecord.clockOut)
+    : "尚未打卡";
+
   const workDuration = getTodayWorkDuration(todayRecord, now);
 
   const defaultClockIn = toLocalDatetimeValue(
     new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0)
   );
+
   const defaultClockOut = toLocalDatetimeValue(
     new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0)
   );
-  const defaultStatusDate = now.toISOString().slice(0, 10);
+
+  const defaultStatusDate = getDateKey(now);
 
   return `
-  <div class="dashboard-grid">
+    <div class="dashboard-grid">
       <div class="hero-panel">
         <div class="card">
           <div class="card__body hero-clock">
@@ -183,7 +239,7 @@ export function renderDashboardView() {
         <div>
           <p class="notice-card__title">${reminder.title}</p>
           <p class="notice-card__text">${reminder.text}</p>
-          <p>今日類型：${todayRule.label}</p>
+          <p>今日類型：${todayRule?.label || "工作日"}</p>
         </div>
       </div>
 
@@ -203,19 +259,28 @@ export function renderDashboardView() {
         <div class="kpi">
           <p class="kpi__label">今日累計工時</p>
           <h4 class="kpi__value">${workDuration}</h4>
-          <div class="kpi__meta">${todayRecord?.type === RECORD_TYPES.WORK ? "自動計算" : (todayRecord ? RECORD_TYPE_LABELS[todayRecord.type] : "等待紀錄")}</div>
+          <div class="kpi__meta">
+            ${
+              todayRecord?.type === RECORD_TYPES.WORK
+                ? "自動計算"
+                : todayRecord
+                ? RECORD_TYPE_LABELS[todayRecord.type]
+                : "等待紀錄"
+            }
+          </div>
         </div>
 
         <div class="kpi">
           <p class="kpi__label">今日考勤判定</p>
           <h4 class="kpi__value">${analysis ? analysis.label : "待完成"}</h4>
-          <div class="kpi__meta">${
-            analysis && todayRecord?.type === RECORD_TYPES.WORK
-              ? `遲到 ${analysis.lateMinutes} 分 / 早退 ${analysis.earlyLeaveMinutes} 分 / 加班 ${analysis.overtimeMinutes} 分`
-              : "完成上下班後自動判定"
-          }</div>
+          <div class="kpi__meta">
+            ${
+              analysis && todayRecord?.type === RECORD_TYPES.WORK
+                ? `遲到 ${analysis.lateMinutes} 分 / 早退 ${analysis.earlyLeaveMinutes} 分 / 加班 ${analysis.overtimeMinutes} 分`
+                : "完成上下班後自動判定"
+            }
+          </div>
         </div>
-        
       </div>
 
       <div class="card">
@@ -254,9 +319,16 @@ export function renderDashboardView() {
                     <option value="out_of_office">外出</option>
                   </select>
                 </div>
+
                 <div class="field">
                   <label for="manual-note">備註</label>
-                  <input id="manual-note" name="manualNote" class="input" type="text" placeholder="例如：外出拍攝、補登、請假原因" />
+                  <input
+                    id="manual-note"
+                    name="manualNote"
+                    class="input"
+                    type="text"
+                    placeholder="例如：外出拍攝、補登、請假原因"
+                  />
                 </div>
               </div>
 
@@ -313,7 +385,14 @@ export function renderDashboardView() {
             <form id="status-record-form" class="form-grid" style="margin-top: 18px;">
               <div class="field">
                 <label for="status-record-date">日期</label>
-                <input id="status-record-date" name="statusRecordDate" class="input" type="date" value="${defaultStatusDate}" required />
+                <input
+                  id="status-record-date"
+                  name="statusRecordDate"
+                  class="input"
+                  type="date"
+                  value="${defaultStatusDate}"
+                  required
+                />
               </div>
 
               <div class="field">
@@ -328,7 +407,13 @@ export function renderDashboardView() {
 
               <div class="field">
                 <label for="status-record-note">備註</label>
-                <input id="status-record-note" name="statusRecordNote" class="input" type="text" placeholder="例如：年假、出差台中、外出拜訪客戶" />
+                <input
+                  id="status-record-note"
+                  name="statusRecordNote"
+                  class="input"
+                  type="text"
+                  placeholder="例如：年假、出差台中、外出拜訪客戶"
+                />
               </div>
 
               <div class="action-row">
