@@ -11,105 +11,104 @@
 </head>
 <body>
   <div class="app-shell">
-  <aside class="sidebar" id="sidebar">
-    <button class="menu-toggle" id="menuToggleBtn" type="button">☰</button>
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
-    <div>
-      <div class="brand">
-        <div class="brand__logo">A</div>
-        <div>
-          <p class="brand__eyebrow">Personal Tool</p>
-          <h1 class="brand__title">Attendance</h1>
+    <aside class="sidebar" id="sidebar">
+      <div>
+        <div class="brand">
+          <div class="brand__logo">A</div>
+          <div>
+            <p class="brand__eyebrow">Personal Tool</p>
+            <h1 class="brand__title">Attendance</h1>
+          </div>
         </div>
+
+        <nav class="sidebar__nav">
+          <button class="nav-btn is-active" data-view="dashboard">打卡主頁</button>
+          <button class="nav-btn" data-view="history">歷史紀錄</button>
+          <button class="nav-btn" data-view="reports">月報表</button>
+          <button class="nav-btn" data-view="leave">請假</button>
+          <button class="nav-btn" data-view="notifications">通知</button>
+          <button class="nav-btn" data-view="announcements">公告</button>
+          <button class="nav-btn" data-view="admin" id="adminNavItem">Admin</button>
+          <button class="nav-btn" data-view="settings">設定</button>
+        </nav>
       </div>
 
-      <nav class="sidebar__nav">
-        <button class="nav-btn is-active" data-view="dashboard">打卡主頁</button>
-        <button class="nav-btn" data-view="history">歷史紀錄</button>
-        <button class="nav-btn" data-view="reports">月報表</button>
-        <button class="nav-btn" data-view="leave">請假</button>
-        <button class="nav-btn" data-view="notifications">通知</button>
-        <button class="nav-btn" data-view="announcements">公告</button>
-        <button class="nav-btn" data-view="admin" id="adminNavItem">Admin</button>
-        <button class="nav-btn" data-view="settings">設定</button>
-      </nav>
-    </div>
+      <div class="sidebar__footer">
+        <p>個人打卡系統</p>
+        <small>V5 / 月報表 / 假別 / 提醒</small>
+      </div>
+    </aside>
 
-    <div class="sidebar__footer">
-      <p>個人打卡系統</p>
-      <small>V5 / 月報表 / 假別 / 提醒</small>
-    </div>
-  </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-  
-
-  <main class="main-content">
-    <header class="topbar">
-      <div class="topbar__inner">
-        <div class="topbar__left">
-          
-          <h1 class="topbar__title">個人打卡系統</h1>
-        </div>
-
-        <div class="topbar__right">
-          <div class="status-clock" id="statusClock"></div>
-          <div class="status-badge status-badge--not-started" id="attendanceStatus">
-            未登入
+    <main class="main-content">
+      <header class="topbar">
+        <div class="topbar__inner">
+          <div class="topbar__left">
+            <button class="menu-toggle" id="menuToggleBtn" type="button">☰</button>
+            <h1 class="topbar__title">個人打卡系統</h1>
           </div>
 
-          <button class="icon-btn" type="button" id="loginEntryBtn">登</button>
-          <button class="icon-btn" type="button" id="logoutBtn" style="display:none;">出</button>
+          <div class="topbar__right">
+            <div class="status-clock" id="statusClock"></div>
+            <div class="status-badge status-badge--not-started" id="attendanceStatus">
+              未登入
+            </div>
 
-          <div class="user-menu">
-            <button class="user-menu__trigger" type="button">
-              <span class="user-menu__avatar" id="topbarUserAvatar">?</span>
-              <span class="user-menu__name" id="topbarUserName">未登入</span>
-              <span class="user-menu__arrow">▾</span>
-            </button>
+            <button class="icon-btn" type="button" id="loginEntryBtn">登</button>
+            <button class="icon-btn" type="button" id="logoutBtn" style="display:none;">出</button>
 
-            <div class="user-menu__dropdown">
-              <button type="button" id="logoutBtnDropdown">登出</button>
+            <div class="user-menu">
+              <button class="user-menu__trigger" type="button">
+                <span class="user-menu__avatar" id="topbarUserAvatar">?</span>
+                <span class="user-menu__name" id="topbarUserName">未登入</span>
+                <span class="user-menu__arrow">▾</span>
+              </button>
+
+              <div class="user-menu__dropdown">
+                <button type="button" id="logoutBtnDropdown">登出</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <section id="app-view"></section>
-  </main>
-</div>
+      <section id="app-view"></section>
+    </main>
+  </div>
+
   <div id="auth-modal" class="auth-modal is-hidden">
-  <div class="auth-modal__backdrop"></div>
+    <div class="auth-modal__backdrop"></div>
 
-  <div class="auth-modal__dialog">
-    <div class="card card--solid">
-      <div class="card__body">
-        <p class="section__eyebrow">Login Required</p>
-        <h3 class="section__title">請先登入</h3>
+    <div class="auth-modal__dialog">
+      <div class="card card--solid">
+        <div class="card__body">
+          <p class="section__eyebrow">Login Required</p>
+          <h3 class="section__title">請先登入</h3>
 
-        <form id="auth-login-form" class="form-grid" style="margin-top:16px;">
-          <div class="field">
-            <label for="auth-email">Email</label>
-            <input id="auth-email" name="email" class="input" type="email" required />
-          </div>
+          <form id="auth-login-form" class="form-grid" style="margin-top:16px;">
+            <div class="field">
+              <label for="auth-email">Email</label>
+              <input id="auth-email" name="email" class="input" type="email" required />
+            </div>
 
-          <div class="field">
-            <label for="auth-password">Password</label>
-            <input id="auth-password" name="password" class="input" type="password" required />
-          </div>
+            <div class="field">
+              <label for="auth-password">Password</label>
+              <input id="auth-password" name="password" class="input" type="password" required />
+            </div>
 
-          <div class="action-row">
-            <button type="submit" class="btn btn--primary">登入</button>
-            <button type="button" class="btn btn--ghost" id="auth-modal-close-btn">取消</button>
-          </div>
+            <div class="action-row">
+              <button type="submit" class="btn btn--primary">登入</button>
+              <button type="button" class="btn btn--ghost" id="auth-modal-close-btn">取消</button>
+            </div>
 
-          <div id="auth-message" class="message-box"></div>
-        </form>
+            <div id="auth-message" class="message-box"></div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>
