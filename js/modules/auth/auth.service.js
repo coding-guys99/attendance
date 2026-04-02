@@ -2,24 +2,17 @@ import { supabase } from "../../lib/supabase.js";
 import { state } from "../../core/state.js";
 
 export async function initializeAuth() {
-  const { data, error } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (error) {
-    console.error("initializeAuth error:", error);
-    state.session = null;
-    state.user = null;
-    return null;
-  }
-
-  state.session = data.session;
-  state.user = data.session?.user || null;
+  state.session = session;
+  state.user = session?.user ?? null;
 
   supabase.auth.onAuthStateChange((_event, session) => {
     state.session = session;
-    state.user = session?.user || null;
+    state.user = session?.user ?? null;
   });
-
-  return state.user;
 }
 
 export async function signIn(email, password) {
@@ -28,12 +21,18 @@ export async function signIn(email, password) {
     password,
   });
 
+  return { data, error };
+}
+
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+
   if (!error) {
-    state.session = data.session;
-    state.user = data.user;
+    state.session = null;
+    state.user = null;
   }
 
-  return { data, error };
+  return { error };
 }
 
 export async function signUp(email, password) {
