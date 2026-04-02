@@ -11,8 +11,9 @@ import {
   createStatusRecord,
   updateFullRecord,
   importRecordsFromJSON,
-  deleteRecord,
+  deleteAttendanceRecord,
   clearAllRecords,
+  fetchAttendanceRecords,
 } from "./modules/attendance/attendance.service.js";
 
 import { startClock } from "./modules/clock/clock.js";
@@ -567,15 +568,29 @@ function bindHistoryEvents() {
   const keywordInput = document.getElementById("filter-keyword");
 
   deleteButtons.forEach((button) => {
-    if (button.dataset.bound === "true") return;
-    button.dataset.bound = "true";
+  if (button.dataset.bound === "true") return;
+  button.dataset.bound = "true";
 
-    button.addEventListener("click", () => {
-      const { id } = button.dataset;
-      deleteRecord(id);
+  button.addEventListener("click", async () => {
+    const { id } = button.dataset;
+
+    const confirmed = window.confirm("確定要刪除這筆紀錄嗎？");
+    if (!confirmed) return;
+
+    try {
+      await deleteAttendanceRecord(id);
       renderAndBind();
-    });
+      showMessage("edit-record-message", "紀錄已刪除。", "success");
+    } catch (error) {
+      console.error("deleteAttendanceRecord error:", error);
+      showMessage(
+        "edit-record-message",
+        error.message || "刪除紀錄失敗。",
+        "error"
+      );
+    }
   });
+});
 
   openEditButtons.forEach((button) => {
     if (button.dataset.bound === "true") return;
