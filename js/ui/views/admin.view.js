@@ -24,6 +24,7 @@ function rerenderAdminPage() {
 
 export function renderAdminView() {
   const users = getUsers();
+  const isAdmin = state.profile?.role === "admin";
 
   return `
     <section class="admin-page">
