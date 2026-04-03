@@ -1,9 +1,6 @@
 import { formatDateTime } from "../../utils/format.js";
 import { state } from "../../core/state.js";
 
-import { state } from "../../core/state.js";
-import { formatDateTime } from "../../utils/format.js";
-
 function renderAnnouncementForm() {
   const isAdmin = state.profile?.role === "admin";
 
