@@ -386,9 +386,7 @@ function renderAdminNav() {
   const adminNav = document.getElementById("adminNavItem");
   if (!adminNav) return;
 
-  const isAllowed =
-    state.user?.role === "admin" ||
-    state.user?.isAdmin === true;
+  const isAllowed = state.profile?.role === "admin";
 
   adminNav.style.display = isAllowed ? "inline-flex" : "none";
 
