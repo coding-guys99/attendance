@@ -39,12 +39,67 @@ import {
   signOut,
 } from "./modules/auth/auth.service.js";
 
-import { fetchAnnouncements } from "./modules/announcement/announcement.service.js";
+import {
+  fetchAnnouncements,
+  createAnnouncement,
+} from "./modules/announcement/announcement.service.js";
+
 import {
   fetchNotifications,
   getUnreadNotificationCount,
   markNotificationAsRead,
 } from "./modules/notification/notification.service.js";
+
+function bindAnnouncementEvents() {
+  const form = document.getElementById("announcement-form");
+  if (!form || form.dataset.bound === "true") return;
+
+  form.dataset.bound = "true";
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const formData = new FormData(form);
+    const title = formData.get("announcementTitle");
+    const category = formData.get("announcementCategory");
+    const content = formData.get("announcementContent");
+
+    const messageEl = document.getElementById("announcement-message");
+
+    if (!title || !content) {
+      if (messageEl) {
+        messageEl.textContent = "請填寫完整標題與內容。";
+        messageEl.className = "message-box is-visible message-box--error";
+      }
+      return;
+    }
+
+    try {
+      await createAnnouncement({
+        title,
+        category,
+        content,
+      });
+
+      form.reset();
+
+      if (messageEl) {
+        messageEl.textContent = "公告已發布。";
+        messageEl.className = "message-box is-visible message-box--success";
+      }
+
+      await loadAnnouncementAndNotificationData();
+      renderAndBind();
+    } catch (error) {
+      console.error("createAnnouncement error:", error);
+
+      if (messageEl) {
+        messageEl.textContent = error.message || "公告發布失敗。";
+        messageEl.className = "message-box is-visible message-box--error";
+      }
+    }
+  });
+}
 
 async function loadAnnouncementAndNotificationData() {
   try {
@@ -837,6 +892,11 @@ function bindViewEvents() {
   
   if (state.currentView === VIEW_TYPES.NOTIFICATIONS) {
   bindNotificationEvents();
+  return;
+}
+
+if (state.currentView === VIEW_TYPES.ANNOUNCEMENTS) {
+  bindAnnouncementEvents();
   return;
 }
 
