@@ -377,20 +377,18 @@ function bindAuthModalEvents() {
 
     const { error } = await signIn(email, password);
 
-if (error) {
-  showMessage("auth-message", error.message || "登入失敗。", "error");
-  return;
-}
+    if (error) {
+      showMessage("auth-message", error.message || "登入失敗。", "error");
+      return;
+    }
 
-await fetchAttendanceRecords();
-closeAuthModal();
-renderAndBind();
+    // ✅ 正確位置（登入成功後才跑）
+    await fetchAttendanceRecords();
+    await loadAnnouncementAndNotificationData();
+
+    closeAuthModal();
+    renderAndBind();
   });
-  
-  await fetchAttendanceRecords();
-await loadAnnouncementAndNotificationData();
-closeAuthModal();
-renderAndBind();
 
   authModalBound = true;
 }
