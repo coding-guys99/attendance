@@ -2,8 +2,7 @@ import { formatDateTime } from "../../utils/format.js";
 import { state } from "../../core/state.js";
 
 function renderAnnouncementForm() {
-  const isAdmin =
-    state.user?.role === "admin" || state.user?.isAdmin === true;
+  const isAdmin = state.profile?.role === "admin";
 
   if (!isAdmin) return "";
 
