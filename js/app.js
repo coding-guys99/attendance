@@ -81,15 +81,16 @@ function bindAnnouncementEvents() {
         content,
       });
 
-      form.reset();
-
-      if (messageEl) {
-        messageEl.textContent = "公告已發布。";
-        messageEl.className = "message-box is-visible message-box--success";
-      }
-
       await loadAnnouncementAndNotificationData();
       renderAndBind();
+
+      form.reset();
+
+      const newMessageEl = document.getElementById("announcement-message");
+      if (newMessageEl) {
+        newMessageEl.textContent = "公告已發布。";
+        newMessageEl.className = "message-box is-visible message-box--success";
+      }
     } catch (error) {
       console.error("createAnnouncement error:", error);
 
@@ -103,6 +104,8 @@ function bindAnnouncementEvents() {
 
 async function loadAnnouncementAndNotificationData() {
   try {
+    state.announcements = await fetchAnnouncements();
+
     if (state.user) {
       state.notifications = await fetchNotifications();
       state.notificationUnreadCount = await getUnreadNotificationCount();
@@ -110,8 +113,6 @@ async function loadAnnouncementAndNotificationData() {
       state.notifications = [];
       state.notificationUnreadCount = 0;
     }
-
-    state.announcements = await fetchAnnouncements();
   } catch (error) {
     console.error("loadAnnouncementAndNotificationData error:", error);
   }
