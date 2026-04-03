@@ -1,7 +1,7 @@
 import { state } from "./core/state.js";
 import { VIEW_TYPES } from "./core/constants.js";
 import { renderApp } from "./ui/renderer.js";
-
+import { fetchMyProfile } from "./modules/profile/profile.service.js";
 
 import {
   initializeAttendance,
@@ -438,6 +438,7 @@ function bindAuthModalEvents() {
     }
 
     // ✅ 正確位置（登入成功後才跑）
+    await fetchMyProfile();
     await fetchAttendanceRecords();
     await loadAnnouncementAndNotificationData();
 
@@ -915,13 +916,14 @@ async function bootstrap() {
   initializeAttendance();
 
   if (state.user) {
+    await fetchMyProfile();
     await fetchAttendanceRecords();
   }
 
   if (!state.filters.month) {
     state.filters.month = getMonthKey(new Date());
   }
-  
+
   await loadAnnouncementAndNotificationData();
 
   renderAndBind();
