@@ -1,6 +1,8 @@
 import { supabase } from "../../lib/supabase.js";
 import { state } from "../../core/state.js";
 
+import { supabase } from "../../lib/supabase.js";
+
 export async function fetchAnnouncements() {
   const { data, error } = await supabase
     .from("announcements")
@@ -10,6 +12,7 @@ export async function fetchAnnouncements() {
     .order("created_at", { ascending: false });
 
   if (error) throw error;
+
   return data || [];
 }
 
