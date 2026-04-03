@@ -13,4 +13,7 @@ export const state = {
     keyword: "",
   },
   now: new Date(),
+  announcements: [],
+notifications: [],
+notificationUnreadCount: 0,
 };
