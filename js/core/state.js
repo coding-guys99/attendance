@@ -3,17 +3,18 @@ import { getMonthKey } from "../utils/date.js";
 import { APP_CONFIG } from "./config.js";
 
 export const state = {
-  session: null,
   user: null,
-  currentView: "dashboard",
+  session: null,
+  profile: null,
   records: [],
-  settings: null,
+  announcements: [],
+  notifications: [],
+  notificationUnreadCount: 0,
   filters: {
     month: "",
     keyword: "",
   },
+  currentView: "dashboard",
+  settings: {},
   now: new Date(),
-  announcements: [],
-notifications: [],
-notificationUnreadCount: 0,
 };
