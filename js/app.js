@@ -39,6 +39,57 @@ import {
   signOut,
 } from "./modules/auth/auth.service.js";
 
+import { fetchAnnouncements } from "./modules/announcement/announcement.service.js";
+import {
+  fetchNotifications,
+  getUnreadNotificationCount,
+  markNotificationAsRead,
+} from "./modules/notification/notification.service.js";
+
+async function loadAnnouncementAndNotificationData() {
+  try {
+    if (state.user) {
+      state.notifications = await fetchNotifications();
+      state.notificationUnreadCount = await getUnreadNotificationCount();
+    } else {
+      state.notifications = [];
+      state.notificationUnreadCount = 0;
+    }
+
+    state.announcements = await fetchAnnouncements();
+  } catch (error) {
+    console.error("loadAnnouncementAndNotificationData error:", error);
+  }
+}
+
+function bindNotificationEvents() {
+  document.querySelectorAll(".btn-mark-notification-read").forEach((button) => {
+    if (button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+
+    button.addEventListener("click", async () => {
+      const id = button.dataset.id;
+
+      try {
+        await markNotificationAsRead(id);
+        await loadAnnouncementAndNotificationData();
+        renderAndBind();
+      } catch (error) {
+        console.error("markNotificationAsRead error:", error);
+      }
+    });
+  });
+}
+
+function renderNotificationCount() {
+  const countEl = document.getElementById("notificationCount");
+  if (!countEl) return;
+
+  const count = state.notificationUnreadCount || 0;
+  countEl.textContent = String(count);
+  countEl.style.display = count > 0 ? "inline-flex" : "none";
+}
+
 let sidebarToggleBound = false;
 let sidebarNavBound = false;
 let authModalBound = false;
@@ -304,6 +355,7 @@ function refreshChrome() {
   renderTopbarUser();
   renderAdminNav();
   syncActiveNav();
+  renderNotificationCount();
 }
 
 function bindAuthModalEvents() {
@@ -334,6 +386,11 @@ await fetchAttendanceRecords();
 closeAuthModal();
 renderAndBind();
   });
+  
+  await fetchAttendanceRecords();
+await loadAnnouncementAndNotificationData();
+closeAuthModal();
+renderAndBind();
 
   authModalBound = true;
 }
@@ -779,6 +836,11 @@ function bindViewEvents() {
     bindReportsEvents();
     return;
   }
+  
+  if (state.currentView === VIEW_TYPES.NOTIFICATIONS) {
+  bindNotificationEvents();
+  return;
+}
 
   bindDashboardEvents();
 }
@@ -801,6 +863,8 @@ async function bootstrap() {
   if (!state.filters.month) {
     state.filters.month = getMonthKey(new Date());
   }
+  
+  await loadAnnouncementAndNotificationData();
 
   renderAndBind();
   bindSidebarEvents();
