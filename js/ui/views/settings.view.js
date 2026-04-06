@@ -1,5 +1,4 @@
 import { state } from "../../core/state.js";
-import { state } from "../../core/state.js";
 import { COUNTRY_OPTIONS } from "../../core/countries.js";
 
 const countryOptionsHtml = COUNTRY_OPTIONS.map(
