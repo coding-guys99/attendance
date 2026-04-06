@@ -1,4 +1,14 @@
 import { state } from "../../core/state.js";
+import { state } from "../../core/state.js";
+import { COUNTRY_OPTIONS } from "../../core/countries.js";
+
+const countryOptionsHtml = COUNTRY_OPTIONS.map(
+  (item) => `
+    <option value="${item.code}" ${state.settings?.country === item.code ? "selected" : ""}>
+      ${item.label}
+    </option>
+  `
+).join("");
 
 export function renderSettingsView() {
   const settings = state.settings;
@@ -163,6 +173,14 @@ export function renderSettingsView() {
                     </div>
                 </div>
                 </div>
+                
+                <div class="field">
+  <label for="country">公共假期國家</label>
+  <select id="country" name="country" class="input">
+    ${countryOptionsHtml}
+  </select>
+  <div class="helper-text">系統會依這個國家自動判斷國定假日。</div>
+</div>
 
             <div class="action-row">
               <button type="submit" class="btn btn--primary">儲存設定</button>
