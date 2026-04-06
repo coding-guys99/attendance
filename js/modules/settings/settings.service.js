@@ -25,6 +25,24 @@ function normalizeTimeString(value, fallback) {
   return /^\d{2}:\d{2}:\d{2}$/.test(trimmed) ? trimmed : fallback;
 }
 
+function normalizeCountry(value, fallback = "TW") {
+  if (typeof value !== "string") return fallback;
+
+  const trimmed = value.trim().toUpperCase();
+  return trimmed || fallback;
+}
+
+function buildDefaultSettings() {
+  return {
+    ...APP_CONFIG.defaultRules,
+    officeName: "",
+    officeLatitude: null,
+    officeLongitude: null,
+    clockInRadiusMeters: 150,
+    country: "TW",
+  };
+}
+
 function mapSettingsFromDb(row) {
   return {
     expectedClockIn: normalizeTimeString(
@@ -51,6 +69,7 @@ function mapSettingsFromDb(row) {
     officeLatitude: normalizeNullableNumber(row.office_latitude, null),
     officeLongitude: normalizeNullableNumber(row.office_longitude, null),
     clockInRadiusMeters: normalizeNumber(row.clock_in_radius_meters, 150),
+    country: normalizeCountry(row.country, "TW"),
   };
 }
 
@@ -80,18 +99,15 @@ function mapSettingsToDb(settings) {
     office_latitude: normalizeNullableNumber(settings.officeLatitude, null),
     office_longitude: normalizeNullableNumber(settings.officeLongitude, null),
     clock_in_radius_meters: normalizeNumber(settings.clockInRadiusMeters, 150),
+    country: normalizeCountry(settings.country, "TW"),
   };
 }
 
 export async function loadSettings() {
+  const defaults = buildDefaultSettings();
+
   if (!state.user) {
-    state.settings = {
-      ...APP_CONFIG.defaultRules,
-      officeName: "",
-      officeLatitude: null,
-      officeLongitude: null,
-      clockInRadiusMeters: 150,
-    };
+    state.settings = defaults;
     return state.settings;
   }
 
@@ -103,26 +119,14 @@ export async function loadSettings() {
 
   if (error) {
     console.error("loadSettings error:", error);
-    state.settings = {
-      ...APP_CONFIG.defaultRules,
-      officeName: "",
-      officeLatitude: null,
-      officeLongitude: null,
-      clockInRadiusMeters: 150,
-    };
+    state.settings = defaults;
     return state.settings;
   }
 
   if (!data) {
     const defaultsPayload = {
       user_id: state.user.id,
-      ...mapSettingsToDb({
-        ...APP_CONFIG.defaultRules,
-        officeName: "",
-        officeLatitude: null,
-        officeLongitude: null,
-        clockInRadiusMeters: 150,
-      }),
+      ...mapSettingsToDb(defaults),
     };
 
     const { data: inserted, error: insertError } = await supabase
@@ -133,13 +137,7 @@ export async function loadSettings() {
 
     if (insertError) {
       console.error("create default settings error:", insertError);
-      state.settings = {
-        ...APP_CONFIG.defaultRules,
-        officeName: "",
-        officeLatitude: null,
-        officeLongitude: null,
-        clockInRadiusMeters: 150,
-      };
+      state.settings = defaults;
       return state.settings;
     }
 
@@ -160,7 +158,13 @@ export async function saveSettings(nextSettings) {
     };
   }
 
-  const payload = mapSettingsToDb(nextSettings);
+  const mergedSettings = {
+    ...buildDefaultSettings(),
+    ...state.settings,
+    ...nextSettings,
+  };
+
+  const payload = mapSettingsToDb(mergedSettings);
 
   const { data, error } = await supabase
     .from("attendance_settings")
@@ -188,13 +192,7 @@ export async function saveSettings(nextSettings) {
 }
 
 export async function resetSettings() {
-  return await saveSettings({
-    ...APP_CONFIG.defaultRules,
-    officeName: "",
-    officeLatitude: null,
-    officeLongitude: null,
-    clockInRadiusMeters: 150,
-  });
+  return await saveSettings(buildDefaultSettings());
 }
 
 export function getSettings() {
