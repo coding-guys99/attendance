@@ -1,4 +1,6 @@
 import { DAY_TYPES, DAY_TYPE_LABELS } from "../../core/day-types.js";
+import { state } from "../../core/state.js";
+import { getCachedPublicHolidays } from "./holiday-api.service.js";
 
 function toDateKey(date) {
   const year = date.getFullYear();
@@ -11,23 +13,7 @@ export function getDayTypeLabel(type) {
   return DAY_TYPE_LABELS[type] || "工作日";
 }
 
-/**
- * 特殊日期規則
- * 你之後可以每年更新這份資料
- *
- * 建議格式：
- * "2026-01-01": {
- *   type: DAY_TYPES.NATIONAL_HOLIDAY,
- *   label: "國定假日",
- *   name: "開國紀念日",
- * }
- */
 export const SPECIAL_DATES = {
-  // "2026-01-01": {
-  //   type: DAY_TYPES.NATIONAL_HOLIDAY,
-  //   label: "國定假日",
-  //   name: "開國紀念日",
-  // },
   // "2026-02-07": {
   //   type: DAY_TYPES.MAKEUP_WORKDAY,
   //   label: "補班日",
@@ -37,10 +23,27 @@ export const SPECIAL_DATES = {
 
 export function getDayRule(date = new Date()) {
   const dateKey = toDateKey(date);
+  const year = date.getFullYear();
+  const country = state.settings?.country || "TW";
+  const holidays = getCachedPublicHolidays(year, country);
+
+  if (holidays[dateKey]) {
+    const holiday = holidays[dateKey];
+    return {
+      date: dateKey,
+      type: DAY_TYPES.NATIONAL_HOLIDAY,
+      label: "國定假日",
+      name: holiday.localName || holiday.name || "國定假日",
+      isSpecialDate: true,
+      isWeekend: false,
+      isHoliday: true,
+      isWorkday: false,
+      country,
+    };
+  }
 
   if (SPECIAL_DATES[dateKey]) {
     const special = SPECIAL_DATES[dateKey];
-
     const type = special.type;
     const label = special.label || getDayTypeLabel(type);
     const name = special.name || label;
@@ -59,6 +62,7 @@ export function getDayRule(date = new Date()) {
       isWorkday:
         type === DAY_TYPES.WORKDAY ||
         type === DAY_TYPES.MAKEUP_WORKDAY,
+      country,
     };
   }
 
@@ -74,6 +78,7 @@ export function getDayRule(date = new Date()) {
       isWeekend: true,
       isHoliday: true,
       isWorkday: false,
+      country,
     };
   }
 
@@ -87,6 +92,7 @@ export function getDayRule(date = new Date()) {
       isWeekend: true,
       isHoliday: true,
       isWorkday: false,
+      country,
     };
   }
 
@@ -99,5 +105,6 @@ export function getDayRule(date = new Date()) {
     isWeekend: false,
     isHoliday: false,
     isWorkday: true,
+    country,
   };
 }
