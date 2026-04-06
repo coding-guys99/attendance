@@ -291,23 +291,30 @@ function bindTopbarActions() {
   });
 
   async function handleLogout() {
-    const { error } = await signOut();
+  const { error } = await signOut();
 
-    if (error) {
-      console.error("signOut error:", error);
-      window.alert(error.message || "登出失敗");
-      return;
-    }
-
-    closeSidebar();
-    closeAuthModal();
-
-    state.currentView = VIEW_TYPES.DASHBOARD;
-    state.records = [];
-
-    renderAndBind();
-    openAuthModal();
+  if (error) {
+    console.error("signOut error:", error);
+    window.alert(error.message || "登出失敗");
+    return;
   }
+
+  closeSidebar();
+  closeAuthModal();
+
+  // ✅ 清 state（很重要）
+  state.currentView = VIEW_TYPES.DASHBOARD;
+  state.records = [];
+  state.settings = null;
+  state.profile = null;
+  state.announcements = [];
+  state.notifications = [];
+  state.notificationUnreadCount = 0;
+  state.holidayCountryLoadedYear = null;
+
+  renderAndBind();
+  openAuthModal();
+}
 
   document.getElementById("logoutBtn")?.addEventListener("click", handleLogout);
   document
@@ -572,7 +579,7 @@ function bindDashboardEvents() {
           return;
         }
 
-        const result = clockIn(new Date());
+        const result = await clockIn(new Date());
         renderAndBind();
         showMessage("action-message", result.message, result.ok ? "success" : "error");
       } catch (error) {
@@ -588,7 +595,7 @@ function bindDashboardEvents() {
     clockOutBtn.addEventListener("click", () => {
       if (!requireLogin("請先登入後再進行下班打卡。")) return;
 
-      const result = clockOut(new Date());
+      const result = await clockOut(new Date());
       renderAndBind();
       showMessage("action-message", result.message, result.ok ? "success" : "error");
     });
@@ -833,6 +840,7 @@ function bindSettingsEvents() {
   country: formData.get("country"),
 });
 
+state.holidayCountryLoadedYear = null;
 await loadHolidayDataForCurrentYear();
 
       renderAndBind();
