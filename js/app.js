@@ -32,7 +32,10 @@ import {
   resetSettings,
 } from "./modules/settings/settings.service.js";
 
-import { getCurrentPositionAsync, evaluateGeofence } from "./utils/geofence.js";
+import {
+  getCurrentPositionAsync,
+  evaluateGeofence,
+} from "./utils/geofence.js";
 
 import {
   initializeAuth,
@@ -51,117 +54,7 @@ import {
   markNotificationAsRead,
 } from "./modules/notification/notification.service.js";
 
-async function loadHolidayDataForCurrentYear() {
-  const country = state.settings?.country || "TW";
-  const now = state.now instanceof Date ? state.now : new Date();
-  const year = now.getFullYear();
-
-  try {
-    await ensurePublicHolidays(year, country);
-    state.holidayCountryLoadedYear = `${country}-${year}`;
-  } catch (error) {
-    console.error("loadHolidayDataForCurrentYear error:", error);
-  }
-}
-
-function bindAnnouncementEvents() {
-  const form = document.getElementById("announcement-form");
-  if (!form || form.dataset.bound === "true") return;
-
-  form.dataset.bound = "true";
-
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const formData = new FormData(form);
-    const title = formData.get("announcementTitle");
-    const category = formData.get("announcementCategory");
-    const content = formData.get("announcementContent");
-
-    const messageEl = document.getElementById("announcement-message");
-
-    if (!title || !content) {
-      if (messageEl) {
-        messageEl.textContent = "請填寫完整標題與內容。";
-        messageEl.className = "message-box is-visible message-box--error";
-      }
-      return;
-    }
-
-    try {
-      await createAnnouncement({
-        title,
-        category,
-        content,
-      });
-
-      await loadAnnouncementAndNotificationData();
-      renderAndBind();
-
-      form.reset();
-
-      const newMessageEl = document.getElementById("announcement-message");
-      if (newMessageEl) {
-        newMessageEl.textContent = "公告已發布。";
-        newMessageEl.className = "message-box is-visible message-box--success";
-      }
-    } catch (error) {
-      console.error("createAnnouncement error:", error);
-
-      if (messageEl) {
-        messageEl.textContent = error.message || "公告發布失敗。";
-        messageEl.className = "message-box is-visible message-box--error";
-      }
-    }
-  });
-}
-
-async function loadAnnouncementAndNotificationData() {
-  try {
-    state.announcements = await fetchAnnouncements();
-
-    if (state.user) {
-      state.notifications = await fetchNotifications();
-      state.notificationUnreadCount = await getUnreadNotificationCount();
-    } else {
-      state.notifications = [];
-      state.notificationUnreadCount = 0;
-    }
-  } catch (error) {
-    console.error("loadAnnouncementAndNotificationData error:", error);
-  }
-}
-
-function bindNotificationEvents() {
-  document.querySelectorAll(".btn-mark-notification-read").forEach((button) => {
-    if (button.dataset.bound === "true") return;
-    button.dataset.bound = "true";
-
-    button.addEventListener("click", async () => {
-      const id = button.dataset.id;
-
-      try {
-        await markNotificationAsRead(id);
-        await loadAnnouncementAndNotificationData();
-        renderAndBind();
-      } catch (error) {
-        console.error("markNotificationAsRead error:", error);
-      }
-    });
-  });
-}
-
-function renderNotificationCount() {
-  const countEl = document.getElementById("notificationCount");
-  if (!countEl) return;
-
-  const count = state.notificationUnreadCount || 0;
-  countEl.textContent = String(count);
-  countEl.style.display = count > 0 ? "inline-flex" : "none";
-}
-
 let sidebarToggleBound = false;
-let sidebarNavBound = false;
 let authModalBound = false;
 let userMenuBound = false;
 let topbarActionsBound = false;
@@ -230,6 +123,115 @@ function closeSidebar() {
   document.getElementById("sidebarOverlay")?.classList.remove("show");
 }
 
+async function loadHolidayDataForCurrentYear() {
+  const country = state.settings?.country || "TW";
+  const now = state.now instanceof Date ? state.now : new Date();
+  const year = now.getFullYear();
+
+  try {
+    await ensurePublicHolidays(year, country);
+    state.holidayCountryLoadedYear = `${country}-${year}`;
+  } catch (error) {
+    console.error("loadHolidayDataForCurrentYear error:", error);
+  }
+}
+
+async function loadAnnouncementAndNotificationData() {
+  try {
+    state.announcements = await fetchAnnouncements();
+
+    if (state.user) {
+      state.notifications = await fetchNotifications();
+      state.notificationUnreadCount = await getUnreadNotificationCount();
+    } else {
+      state.notifications = [];
+      state.notificationUnreadCount = 0;
+    }
+  } catch (error) {
+    console.error("loadAnnouncementAndNotificationData error:", error);
+  }
+}
+
+function bindAnnouncementEvents() {
+  const form = document.getElementById("announcement-form");
+  if (!form || form.dataset.bound === "true") return;
+
+  form.dataset.bound = "true";
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const formData = new FormData(form);
+    const title = formData.get("announcementTitle");
+    const category = formData.get("announcementCategory");
+    const content = formData.get("announcementContent");
+
+    const messageEl = document.getElementById("announcement-message");
+
+    if (!title || !content) {
+      if (messageEl) {
+        messageEl.textContent = "請填寫完整標題與內容。";
+        messageEl.className = "message-box is-visible message-box--error";
+      }
+      return;
+    }
+
+    try {
+      await createAnnouncement({
+        title,
+        category,
+        content,
+      });
+
+      await loadAnnouncementAndNotificationData();
+      renderAndBind();
+
+      form.reset();
+
+      const newMessageEl = document.getElementById("announcement-message");
+      if (newMessageEl) {
+        newMessageEl.textContent = "公告已發布。";
+        newMessageEl.className = "message-box is-visible message-box--success";
+      }
+    } catch (error) {
+      console.error("createAnnouncement error:", error);
+
+      if (messageEl) {
+        messageEl.textContent = error.message || "公告發布失敗。";
+        messageEl.className = "message-box is-visible message-box--error";
+      }
+    }
+  });
+}
+
+function bindNotificationEvents() {
+  document.querySelectorAll(".btn-mark-notification-read").forEach((button) => {
+    if (button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+
+    button.addEventListener("click", async () => {
+      const id = button.dataset.id;
+
+      try {
+        await markNotificationAsRead(id);
+        await loadAnnouncementAndNotificationData();
+        renderAndBind();
+      } catch (error) {
+        console.error("markNotificationAsRead error:", error);
+      }
+    });
+  });
+}
+
+function renderNotificationCount() {
+  const countEl = document.getElementById("notificationCount");
+  if (!countEl) return;
+
+  const count = state.notificationUnreadCount || 0;
+  countEl.textContent = String(count);
+  countEl.style.display = count > 0 ? "inline-flex" : "none";
+}
+
 function bindSidebarToggle() {
   const btn = document.getElementById("menuToggleBtn");
   const sidebar = document.getElementById("sidebar");
@@ -241,7 +243,6 @@ function bindSidebarToggle() {
     btn.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-
       sidebar.classList.toggle("open");
       overlay.classList.toggle("show");
     });
@@ -291,30 +292,29 @@ function bindTopbarActions() {
   });
 
   async function handleLogout() {
-  const { error } = await signOut();
+    const { error } = await signOut();
 
-  if (error) {
-    console.error("signOut error:", error);
-    window.alert(error.message || "登出失敗");
-    return;
+    if (error) {
+      console.error("signOut error:", error);
+      window.alert(error.message || "登出失敗");
+      return;
+    }
+
+    closeSidebar();
+    closeAuthModal();
+
+    state.currentView = VIEW_TYPES.DASHBOARD;
+    state.records = [];
+    state.settings = null;
+    state.profile = null;
+    state.announcements = [];
+    state.notifications = [];
+    state.notificationUnreadCount = 0;
+    state.holidayCountryLoadedYear = null;
+
+    renderAndBind();
+    openAuthModal();
   }
-
-  closeSidebar();
-  closeAuthModal();
-
-  // ✅ 清 state（很重要）
-  state.currentView = VIEW_TYPES.DASHBOARD;
-  state.records = [];
-  state.settings = null;
-  state.profile = null;
-  state.announcements = [];
-  state.notifications = [];
-  state.notificationUnreadCount = 0;
-  state.holidayCountryLoadedYear = null;
-
-  renderAndBind();
-  openAuthModal();
-}
 
   document.getElementById("logoutBtn")?.addEventListener("click", handleLogout);
   document
@@ -329,6 +329,8 @@ function updateClock() {
   if (!clockEl) return;
 
   const now = new Date();
+  state.now = now;
+
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const date = String(now.getDate()).padStart(2, "0");
@@ -383,25 +385,25 @@ function renderTopbarUser() {
   if (!userNameEl || !userAvatarEl) return;
 
   if (!state.user) {
-  userNameEl.textContent = "未登入";
-  userAvatarEl.textContent = "?";
+    userNameEl.textContent = "未登入";
+    userAvatarEl.textContent = "?";
 
-  if (loginEntryBtn) loginEntryBtn.style.display = "inline-flex";
-  if (logoutBtn) logoutBtn.style.display = "none";
-  return;
-}
+    if (loginEntryBtn) loginEntryBtn.style.display = "inline-flex";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    return;
+  }
 
-const displayName =
-  state.user.name ||
-  state.user.full_name ||
-  state.user.email ||
-  "User";
+  const displayName =
+    state.user.name ||
+    state.user.full_name ||
+    state.user.email ||
+    "User";
 
-userNameEl.textContent = displayName;
-userAvatarEl.textContent = String(displayName).slice(0, 1).toUpperCase();
+  userNameEl.textContent = displayName;
+  userAvatarEl.textContent = String(displayName).slice(0, 1).toUpperCase();
 
-if (loginEntryBtn) loginEntryBtn.style.display = "none";
-if (logoutBtn) logoutBtn.style.display = "inline-flex";
+  if (loginEntryBtn) loginEntryBtn.style.display = "none";
+  if (logoutBtn) logoutBtn.style.display = "inline-flex";
 }
 
 function renderAdminNav() {
@@ -409,7 +411,6 @@ function renderAdminNav() {
   if (!adminNav) return;
 
   const isAllowed = state.profile?.role === "admin";
-
   adminNav.style.display = isAllowed ? "inline-flex" : "none";
 
   if (!isAllowed && state.currentView === VIEW_TYPES.ADMIN) {
@@ -457,8 +458,9 @@ function bindAuthModalEvents() {
       return;
     }
 
-    // ✅ 正確位置（登入成功後才跑）
     await fetchMyProfile();
+    await loadSettings();
+    await loadHolidayDataForCurrentYear();
     await fetchAttendanceRecords();
     await loadAnnouncementAndNotificationData();
 
@@ -489,14 +491,22 @@ function bindImportInput(inputEl, messageTargetId = "") {
       renderAndBind();
 
       if (messageTargetId) {
-        showMessage(messageTargetId, result.message, result.ok ? "success" : "error");
+        showMessage(
+          messageTargetId,
+          result.message,
+          result.ok ? "success" : "error"
+        );
       } else {
         window.alert(result.message);
       }
     } catch (error) {
       console.error(error);
       if (messageTargetId) {
-        showMessage(messageTargetId, "JSON 匯入失敗，請確認檔案格式。", "error");
+        showMessage(
+          messageTargetId,
+          "JSON 匯入失敗，請確認檔案格式。",
+          "error"
+        );
       } else {
         window.alert("JSON 匯入失敗，請確認檔案格式。");
       }
@@ -528,9 +538,7 @@ function bindSidebarEvents() {
       } else if (view === VIEW_TYPES.ANNOUNCEMENTS) {
         state.currentView = VIEW_TYPES.ANNOUNCEMENTS;
       } else if (view === VIEW_TYPES.ADMIN) {
-        const isAllowed =
-          state.user?.role === "admin" ||
-          state.user?.isAdmin === true;
+        const isAllowed = state.profile?.role === "admin";
 
         if (!isAllowed) {
           window.alert("只有管理員可以進入此頁面");
@@ -547,8 +555,6 @@ function bindSidebarEvents() {
       renderAndBind();
     });
   });
-
-  sidebarNavBound = true;
 }
 
 function bindDashboardEvents() {
@@ -573,7 +579,9 @@ function bindDashboardEvents() {
         if (!fence.allowed) {
           showMessage(
             "action-message",
-            `目前不在公司打卡範圍內，距離約 ${Math.round(fence.distanceMeters)} 公尺。`,
+            `目前不在公司打卡範圍內，距離約 ${Math.round(
+              fence.distanceMeters
+            )} 公尺。`,
             "error"
           );
           return;
@@ -581,10 +589,18 @@ function bindDashboardEvents() {
 
         const result = await clockIn(new Date());
         renderAndBind();
-        showMessage("action-message", result.message, result.ok ? "success" : "error");
+        showMessage(
+          "action-message",
+          result.message,
+          result.ok ? "success" : "error"
+        );
       } catch (error) {
         console.error(error);
-        showMessage("action-message", "無法取得定位，請確認已開啟定位權限。", "error");
+        showMessage(
+          "action-message",
+          "無法取得定位，請確認已開啟定位權限。",
+          "error"
+        );
       }
     });
   }
@@ -592,12 +608,16 @@ function bindDashboardEvents() {
   if (clockOutBtn && clockOutBtn.dataset.bound !== "true") {
     clockOutBtn.dataset.bound = "true";
 
-    clockOutBtn.addEventListener("click", () => {
+    clockOutBtn.addEventListener("click", async () => {
       if (!requireLogin("請先登入後再進行下班打卡。")) return;
 
       const result = await clockOut(new Date());
       renderAndBind();
-      showMessage("action-message", result.message, result.ok ? "success" : "error");
+      showMessage(
+        "action-message",
+        result.message,
+        result.ok ? "success" : "error"
+      );
     });
   }
 
@@ -619,7 +639,11 @@ function bindDashboardEvents() {
       });
 
       renderAndBind();
-      showMessage("manual-message", result.message, result.ok ? "success" : "error");
+      showMessage(
+        "manual-message",
+        result.message,
+        result.ok ? "success" : "error"
+      );
     });
   }
 
@@ -640,7 +664,11 @@ function bindDashboardEvents() {
       });
 
       renderAndBind();
-      showMessage("status-message", result.message, result.ok ? "success" : "error");
+      showMessage(
+        "status-message",
+        result.message,
+        result.ok ? "success" : "error"
+      );
     });
   }
 
@@ -672,7 +700,9 @@ function fillEditFormFromButton(button) {
   const clockOutInput = document.getElementById("edit-clock-out");
   const noteInput = document.getElementById("edit-note");
 
-  if (!idInput || !typeInput || !clockInInput || !clockOutInput || !noteInput) return;
+  if (!idInput || !typeInput || !clockInInput || !clockOutInput || !noteInput) {
+    return;
+  }
 
   const recordId = button.dataset.id || "";
   const type = button.dataset.type || "work";
@@ -699,29 +729,29 @@ function bindHistoryEvents() {
   const keywordInput = document.getElementById("filter-keyword");
 
   deleteButtons.forEach((button) => {
-  if (button.dataset.bound === "true") return;
-  button.dataset.bound = "true";
+    if (button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
 
-  button.addEventListener("click", async () => {
-    const { id } = button.dataset;
+    button.addEventListener("click", async () => {
+      const { id } = button.dataset;
 
-    const confirmed = window.confirm("確定要刪除這筆紀錄嗎？");
-    if (!confirmed) return;
+      const confirmed = window.confirm("確定要刪除這筆紀錄嗎？");
+      if (!confirmed) return;
 
-    try {
-      await deleteAttendanceRecord(id);
-      renderAndBind();
-      showMessage("edit-record-message", "紀錄已刪除。", "success");
-    } catch (error) {
-      console.error("deleteAttendanceRecord error:", error);
-      showMessage(
-        "edit-record-message",
-        error.message || "刪除紀錄失敗。",
-        "error"
-      );
-    }
+      try {
+        await deleteAttendanceRecord(id);
+        renderAndBind();
+        showMessage("edit-record-message", "紀錄已刪除。", "success");
+      } catch (error) {
+        console.error("deleteAttendanceRecord error:", error);
+        showMessage(
+          "edit-record-message",
+          error.message || "刪除紀錄失敗。",
+          "error"
+        );
+      }
+    });
   });
-});
 
   openEditButtons.forEach((button) => {
     if (button.dataset.bound === "true") return;
@@ -740,25 +770,31 @@ function bindHistoryEvents() {
     editForm.dataset.bound = "true";
 
     editForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
+      event.preventDefault();
 
-  const recordId = document.getElementById("edit-record-id")?.value || "";
-  const type = document.getElementById("edit-record-type")?.value || "work";
-  const clockInValue = document.getElementById("edit-clock-in")?.value || "";
-  const clockOutValue = document.getElementById("edit-clock-out")?.value || "";
-  const note = document.getElementById("edit-note")?.value || "";
+      const recordId = document.getElementById("edit-record-id")?.value || "";
+      const type = document.getElementById("edit-record-type")?.value || "work";
+      const clockInValue =
+        document.getElementById("edit-clock-in")?.value || "";
+      const clockOutValue =
+        document.getElementById("edit-clock-out")?.value || "";
+      const note = document.getElementById("edit-note")?.value || "";
 
-  const result = await updateFullRecord({
-    recordId,
-    type,
-    clockInValue,
-    clockOutValue,
-    note,
-  });
+      const result = await updateFullRecord({
+        recordId,
+        type,
+        clockInValue,
+        clockOutValue,
+        note,
+      });
 
-  renderAndBind();
-  showMessage("edit-record-message", result.message, result.ok ? "success" : "error");
-});
+      renderAndBind();
+      showMessage(
+        "edit-record-message",
+        result.message,
+        result.ok ? "success" : "error"
+      );
+    });
   }
 
   if (clearAllBtn && clearAllBtn.dataset.bound !== "true") {
@@ -811,7 +847,9 @@ function bindHistoryEvents() {
 function bindSettingsEvents() {
   const settingsForm = document.getElementById("settings-form");
   const resetBtn = document.getElementById("reset-settings-btn");
-  const setOfficeLocationBtn = document.getElementById("set-office-current-location-btn");
+  const setOfficeLocationBtn = document.getElementById(
+    "set-office-current-location-btn"
+  );
 
   if (settingsForm && settingsForm.dataset.bound !== "true") {
     settingsForm.dataset.bound = "true";
@@ -828,23 +866,27 @@ function bindSettingsEvents() {
       const formData = new FormData(settingsForm);
 
       const result = await saveSettings({
-  expectedClockIn: formData.get("expectedClockIn"),
-  expectedClockOut: formData.get("expectedClockOut"),
-  lateGraceMinutes: formData.get("lateGraceMinutes"),
-  earlyLeaveGraceMinutes: formData.get("earlyLeaveGraceMinutes"),
-  overtimeThresholdMinutes: formData.get("overtimeThresholdMinutes"),
-  officeName: formData.get("officeName"),
-  officeLatitude: formData.get("officeLatitude"),
-  officeLongitude: formData.get("officeLongitude"),
-  clockInRadiusMeters: formData.get("clockInRadiusMeters"),
-  country: formData.get("country"),
-});
+        expectedClockIn: formData.get("expectedClockIn"),
+        expectedClockOut: formData.get("expectedClockOut"),
+        lateGraceMinutes: formData.get("lateGraceMinutes"),
+        earlyLeaveGraceMinutes: formData.get("earlyLeaveGraceMinutes"),
+        overtimeThresholdMinutes: formData.get("overtimeThresholdMinutes"),
+        officeName: formData.get("officeName"),
+        officeLatitude: formData.get("officeLatitude"),
+        officeLongitude: formData.get("officeLongitude"),
+        clockInRadiusMeters: formData.get("clockInRadiusMeters"),
+        country: formData.get("country"),
+      });
 
-state.holidayCountryLoadedYear = null;
-await loadHolidayDataForCurrentYear();
+      state.holidayCountryLoadedYear = null;
+      await loadHolidayDataForCurrentYear();
 
       renderAndBind();
-      showMessage("settings-message", result.message, result.ok ? "success" : "error");
+      showMessage(
+        "settings-message",
+        result.message,
+        result.ok ? "success" : "error"
+      );
     });
   }
 
@@ -859,8 +901,14 @@ await loadHolidayDataForCurrentYear();
       }
 
       const result = await resetSettings();
+      state.holidayCountryLoadedYear = null;
+      await loadHolidayDataForCurrentYear();
       renderAndBind();
-      showMessage("settings-message", result.message, result.ok ? "success" : "error");
+      showMessage(
+        "settings-message",
+        result.message,
+        result.ok ? "success" : "error"
+      );
     });
   }
 
@@ -877,10 +925,18 @@ await loadHolidayDataForCurrentYear();
         if (latInput) latInput.value = position.latitude;
         if (lngInput) lngInput.value = position.longitude;
 
-        showMessage("geofence-message", "已取得目前位置，請記得按儲存設定。", "success");
+        showMessage(
+          "geofence-message",
+          "已取得目前位置，請記得按儲存設定。",
+          "success"
+        );
       } catch (error) {
         console.error(error);
-        showMessage("geofence-message", "無法取得目前位置，請確認已允許定位權限。", "error");
+        showMessage(
+          "geofence-message",
+          "無法取得目前位置，請確認已允許定位權限。",
+          "error"
+        );
       }
     });
   }
@@ -914,16 +970,16 @@ function bindViewEvents() {
     bindReportsEvents();
     return;
   }
-  
-  if (state.currentView === VIEW_TYPES.NOTIFICATIONS) {
-  bindNotificationEvents();
-  return;
-}
 
-if (state.currentView === VIEW_TYPES.ANNOUNCEMENTS) {
-  bindAnnouncementEvents();
-  return;
-}
+  if (state.currentView === VIEW_TYPES.NOTIFICATIONS) {
+    bindNotificationEvents();
+    return;
+  }
+
+  if (state.currentView === VIEW_TYPES.ANNOUNCEMENTS) {
+    bindAnnouncementEvents();
+    return;
+  }
 
   bindDashboardEvents();
 }
@@ -936,9 +992,9 @@ function renderAndBind() {
 
 async function bootstrap() {
   await initializeAuth();
-await loadSettings();
-await loadHolidayDataForCurrentYear();
-initializeAttendance();
+  await loadSettings();
+  await loadHolidayDataForCurrentYear();
+  initializeAttendance();
 
   if (state.user) {
     await fetchMyProfile();
