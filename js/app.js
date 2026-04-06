@@ -2,6 +2,7 @@ import { state } from "./core/state.js";
 import { VIEW_TYPES } from "./core/constants.js";
 import { renderApp } from "./ui/renderer.js";
 import { fetchMyProfile } from "./modules/profile/profile.service.js";
+import { ensurePublicHolidays } from "./modules/calendar/holiday-api.service.js";
 
 import {
   initializeAttendance,
@@ -49,6 +50,19 @@ import {
   getUnreadNotificationCount,
   markNotificationAsRead,
 } from "./modules/notification/notification.service.js";
+
+async function loadHolidayDataForCurrentYear() {
+  const country = state.settings?.country || "TW";
+  const now = state.now instanceof Date ? state.now : new Date();
+  const year = now.getFullYear();
+
+  try {
+    await ensurePublicHolidays(year, country);
+    state.holidayCountryLoadedYear = `${country}-${year}`;
+  } catch (error) {
+    console.error("loadHolidayDataForCurrentYear error:", error);
+  }
+}
 
 function bindAnnouncementEvents() {
   const form = document.getElementById("announcement-form");
@@ -807,16 +821,19 @@ function bindSettingsEvents() {
       const formData = new FormData(settingsForm);
 
       const result = await saveSettings({
-        expectedClockIn: formData.get("expectedClockIn"),
-        expectedClockOut: formData.get("expectedClockOut"),
-        lateGraceMinutes: formData.get("lateGraceMinutes"),
-        earlyLeaveGraceMinutes: formData.get("earlyLeaveGraceMinutes"),
-        overtimeThresholdMinutes: formData.get("overtimeThresholdMinutes"),
-        officeName: formData.get("officeName"),
-        officeLatitude: formData.get("officeLatitude"),
-        officeLongitude: formData.get("officeLongitude"),
-        clockInRadiusMeters: formData.get("clockInRadiusMeters"),
-      });
+  expectedClockIn: formData.get("expectedClockIn"),
+  expectedClockOut: formData.get("expectedClockOut"),
+  lateGraceMinutes: formData.get("lateGraceMinutes"),
+  earlyLeaveGraceMinutes: formData.get("earlyLeaveGraceMinutes"),
+  overtimeThresholdMinutes: formData.get("overtimeThresholdMinutes"),
+  officeName: formData.get("officeName"),
+  officeLatitude: formData.get("officeLatitude"),
+  officeLongitude: formData.get("officeLongitude"),
+  clockInRadiusMeters: formData.get("clockInRadiusMeters"),
+  country: formData.get("country"),
+});
+
+await loadHolidayDataForCurrentYear();
 
       renderAndBind();
       showMessage("settings-message", result.message, result.ok ? "success" : "error");
@@ -911,8 +928,9 @@ function renderAndBind() {
 
 async function bootstrap() {
   await initializeAuth();
-  await loadSettings();
-  initializeAttendance();
+await loadSettings();
+await loadHolidayDataForCurrentYear();
+initializeAttendance();
 
   if (state.user) {
     await fetchMyProfile();
