@@ -10,6 +10,8 @@ export const state = {
   announcements: [],
   notifications: [],
   notificationUnreadCount: 0,
+  holidayCache: {},
+  holidayCountryLoadedYear: null,
   filters: {
     month: "",
     keyword: "",
